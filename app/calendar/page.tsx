@@ -77,7 +77,7 @@ export default function Calendar() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="bg-white rounded-xl shadow p-6">
-        
+
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -98,7 +98,7 @@ export default function Calendar() {
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          
+
           <button
             onClick={previousMonth}
             className="px-4 py-2 rounded-lg hover:bg-gray-100 text-xl"
