@@ -6,9 +6,29 @@ export async function proxy(request: NextRequest) {
     request,
   });
 
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error(
+      "Supabase configuration is missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY."
+    );
+
+    return new NextResponse(
+      "Supabase configuration is missing.",
+      {
+        status: 500,
+      }
+    );
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -16,17 +36,32 @@ export async function proxy(request: NextRequest) {
         },
 
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
+          cookiesToSet.forEach(
+            ({ name, value }) => {
+              request.cookies.set(
+                name,
+                value
+              );
+            }
+          );
 
           response = NextResponse.next({
             request,
           });
 
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+              options,
+            }) => {
+              response.cookies.set(
+                name,
+                value,
+                options
+              );
+            }
+          );
         },
       },
     }
@@ -36,20 +71,36 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+  const pathname =
+    request.nextUrl.pathname;
 
-  if (!user && pathname !== "/login") {
-    const loginUrl = request.nextUrl.clone();
+  if (
+    !user &&
+    pathname !== "/login"
+  ) {
+    const loginUrl =
+      request.nextUrl.clone();
+
     loginUrl.pathname = "/login";
 
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(
+      loginUrl
+    );
   }
 
-  if (user && pathname === "/login") {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/dashboard";
+  if (
+    user &&
+    pathname === "/login"
+  ) {
+    const dashboardUrl =
+      request.nextUrl.clone();
 
-    return NextResponse.redirect(dashboardUrl);
+    dashboardUrl.pathname =
+      "/dashboard";
+
+    return NextResponse.redirect(
+      dashboardUrl
+    );
   }
 
   return response;
