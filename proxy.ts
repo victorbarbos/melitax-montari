@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseUrl || !supabaseKey) {
     console.error(
-      "Supabase configuration is missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      "Supabase configuration is missing."
     );
 
     return new NextResponse(
@@ -74,10 +74,23 @@ export async function proxy(request: NextRequest) {
   const pathname =
     request.nextUrl.pathname;
 
-  if (
-    !user &&
-    pathname !== "/login"
-  ) {
+  // ==========================================
+  // PAGINI PUBLICE
+  // ==========================================
+
+  const publicPaths = [
+    "/",
+    "/login",
+  ];
+
+  const isPublicPath =
+    publicPaths.includes(pathname);
+
+  // ==========================================
+  // UTILIZATOR NEAUTENTIFICAT
+  // ==========================================
+
+  if (!user && !isPublicPath) {
     const loginUrl =
       request.nextUrl.clone();
 
@@ -87,6 +100,10 @@ export async function proxy(request: NextRequest) {
       loginUrl
     );
   }
+
+  // ==========================================
+  // UTILIZATOR AUTENTIFICAT
+  // ==========================================
 
   if (
     user &&

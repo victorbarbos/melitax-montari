@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createAuditLog } from "@/lib/supabase/audit";
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -51,7 +52,7 @@ async function getCurrentUser() {
   const cookieStore = await cookies();
 
   const supabase = createServerClient(
-    supabaseUrl!,
+    supabaseUrl,
     supabaseAnonKey,
     {
       cookies: {
@@ -62,11 +63,7 @@ async function getCurrentUser() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
+              ({ name, value, options }) => {
                 cookieStore.set(
                   name,
                   value,
@@ -94,7 +91,7 @@ async function getCurrentUser() {
 }
 
 // ======================================================
-// VERIFICĂ DACĂ UTILIZATORUL ESTE ADMINISTRATOR
+// VERIFICĂ PROFILUL UTILIZATORULUI CURENT
 // ======================================================
 
 async function getCurrentProfile(
@@ -123,16 +120,15 @@ async function getCurrentProfile(
 
 export async function GET() {
   try {
-    // -----------------------------------------------
-    // 1. Utilizator autentificat
-    // -----------------------------------------------
-
     const {
       user: currentUser,
       error: authError,
     } = await getCurrentUser();
 
-    if (authError || !currentUser) {
+    if (
+      authError ||
+      !currentUser
+    ) {
       return NextResponse.json(
         {
           error:
@@ -143,10 +139,6 @@ export async function GET() {
         }
       );
     }
-
-    // -----------------------------------------------
-    // 2. Profilul utilizatorului curent
-    // -----------------------------------------------
 
     const {
       profile: currentProfile,
@@ -170,11 +162,6 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 3. Doar Super Admin și Administrator
-    // pot vedea utilizatorii
-    // -----------------------------------------------
-
     if (
       currentProfile.active !== true ||
       ![
@@ -194,10 +181,6 @@ export async function GET() {
         }
       );
     }
-
-    // -----------------------------------------------
-    // 4. Luăm profilele
-    // -----------------------------------------------
 
     const {
       data: profiles,
@@ -240,10 +223,6 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 5. Luăm utilizatorii din Supabase Auth
-    // -----------------------------------------------
-
     const {
       data: authUsersData,
       error: authUsersError,
@@ -272,26 +251,21 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 6. Facem map pentru email
-    // -----------------------------------------------
+    const emailMap =
+      new Map<
+        string,
+        string | null
+      >();
 
-    const emailMap = new Map<
-      string,
-      string | null
-    >();
-
-    for (const authUser of
-      authUsersData.users) {
+    for (
+      const authUser of
+      authUsersData.users
+    ) {
       emailMap.set(
         authUser.id,
         authUser.email || null
       );
     }
-
-    // -----------------------------------------------
-    // 7. Combinăm profiles + Auth
-    // -----------------------------------------------
 
     const users = (
       profiles || []
@@ -303,10 +277,6 @@ export async function GET() {
           profile.id
         ) || null,
     }));
-
-    // -----------------------------------------------
-    // 8. Răspuns
-    // -----------------------------------------------
 
     return NextResponse.json(
       {
@@ -342,16 +312,15 @@ export async function POST(
   request: Request
 ) {
   try {
-    // -----------------------------------------------
-    // 1. Utilizator autentificat
-    // -----------------------------------------------
-
     const {
       user: currentUser,
       error: authError,
     } = await getCurrentUser();
 
-    if (authError || !currentUser) {
+    if (
+      authError ||
+      !currentUser
+    ) {
       return NextResponse.json(
         {
           error:
@@ -363,16 +332,13 @@ export async function POST(
       );
     }
 
-    // -----------------------------------------------
-    // 2. Profil utilizator curent
-    // -----------------------------------------------
-
     const {
       profile: currentProfile,
       error: profileError,
-    } = await getCurrentProfile(
-      currentUser.id
-    );
+    } =
+      await getCurrentProfile(
+        currentUser.id
+      );
 
     if (
       profileError ||
@@ -388,11 +354,6 @@ export async function POST(
         }
       );
     }
-
-    // -----------------------------------------------
-    // 3. Doar Super Admin și Administrator
-    // pot crea utilizatori
-    // -----------------------------------------------
 
     if (
       currentProfile.active !== true ||
@@ -414,42 +375,40 @@ export async function POST(
       );
     }
 
-    // -----------------------------------------------
-    // 4. Citim formularul
-    // -----------------------------------------------
-
     const body =
       await request.json();
 
-    const fullName = String(
-      body.fullName || ""
-    ).trim();
+    const fullName =
+      String(
+        body.fullName || ""
+      ).trim();
 
-    const phone = String(
-      body.phone || ""
-    ).trim();
+    const phone =
+      String(
+        body.phone || ""
+      ).trim();
 
-    const email = String(
-      body.email || ""
-    )
-      .trim()
-      .toLowerCase();
+    const email =
+      String(
+        body.email || ""
+      )
+        .trim()
+        .toLowerCase();
 
-    const password = String(
-      body.password || ""
-    );
+    const password =
+      String(
+        body.password || ""
+      );
 
-    const role = String(
-      body.role || ""
-    );
+    const role =
+      String(
+        body.role || ""
+      );
 
-    const teamId = body.teamId
-      ? String(body.teamId)
-      : null;
-
-    // -----------------------------------------------
-    // 5. Validări
-    // -----------------------------------------------
+    const teamId =
+      body.teamId
+        ? String(body.teamId)
+        : null;
 
     if (!fullName) {
       return NextResponse.json(
@@ -490,13 +449,6 @@ export async function POST(
       );
     }
 
-    // -----------------------------------------------
-    // 6. Rolurile permise
-    //
-    // IMPORTANT:
-    // super_admin NU poate fi creat.
-    // -----------------------------------------------
-
     const allowedRoles = [
       "administrator",
       "manager",
@@ -520,9 +472,22 @@ export async function POST(
       );
     }
 
-    // -----------------------------------------------
-    // 7. Verificăm echipa
-    // -----------------------------------------------
+    if (
+      currentProfile.role ===
+        "administrator" &&
+      role ===
+        "administrator"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Administratorii nu pot crea alți Administratori.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
 
     if (teamId) {
       const {
@@ -556,10 +521,6 @@ export async function POST(
       }
     }
 
-    // -----------------------------------------------
-    // 8. Creăm utilizatorul în Auth
-    // -----------------------------------------------
-
     const {
       data: createdUserData,
       error: createUserError,
@@ -591,14 +552,6 @@ export async function POST(
     const newUser =
       createdUserData.user;
 
-    // -----------------------------------------------
-    // 9. Creăm profilul
-    //
-    // IMPORTANT:
-    // Nu punem email în profiles.
-    // Emailul rămâne în Supabase Auth.
-    // -----------------------------------------------
-
     const {
       data: profile,
       error: insertProfileError,
@@ -607,20 +560,17 @@ export async function POST(
         .from("profiles")
         .insert({
           id: newUser.id,
-          full_name: fullName,
+          full_name:
+            fullName,
           phone:
             phone || null,
           role,
-          team_id: teamId,
+          team_id:
+            teamId,
           active: true,
         })
         .select()
         .single();
-
-    // -----------------------------------------------
-    // 10. Dacă profilul eșuează,
-    // ștergem utilizatorul Auth
-    // -----------------------------------------------
 
     if (
       insertProfileError ||
@@ -642,9 +592,50 @@ export async function POST(
       );
     }
 
-    // -----------------------------------------------
-    // 11. Răspuns
-    // -----------------------------------------------
+    try {
+      await createAuditLog({
+        userId:
+          currentUser.id,
+
+        action:
+          "CREATE",
+
+        entityType:
+          "USER",
+
+        entityId:
+          newUser.id,
+
+        entityName:
+          fullName,
+
+        oldData:
+          null,
+
+        newData: {
+          full_name:
+            fullName,
+
+          phone:
+            phone || null,
+
+          email,
+
+          role,
+
+          team_id:
+            teamId,
+
+          active:
+            true,
+        },
+      });
+    } catch (auditError) {
+      console.error(
+        "CREATE USER AUDIT LOG ERROR:",
+        auditError
+      );
+    }
 
     return NextResponse.json(
       {
@@ -680,6 +671,794 @@ export async function POST(
       {
         error:
           "A apărut o eroare la crearea utilizatorului.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+// ======================================================
+// PUT — MODIFICARE UTILIZATOR
+// ======================================================
+
+export async function PUT(
+  request: Request
+) {
+  try {
+    // -----------------------------------------------
+    // 1. Utilizator autentificat
+    // -----------------------------------------------
+
+    const {
+      user: currentUser,
+      error: authError,
+    } = await getCurrentUser();
+
+    if (
+      authError ||
+      !currentUser
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Nu ești autentificat.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 2. Profilul celui care face modificarea
+    // -----------------------------------------------
+
+    const {
+      profile: currentProfile,
+      error: profileError,
+    } =
+      await getCurrentProfile(
+        currentUser.id
+      );
+
+    if (
+      profileError ||
+      !currentProfile
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Profilul utilizatorului nu a fost găsit.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 3. Verificăm permisiunea
+    // -----------------------------------------------
+
+    if (
+      currentProfile.active !== true ||
+      ![
+        "super_admin",
+        "administrator",
+      ].includes(
+        currentProfile.role
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Nu ai permisiunea de a modifica utilizatori.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 4. Citim datele
+    // -----------------------------------------------
+
+    const body =
+      await request.json();
+
+    const targetUserId =
+      String(
+        body.id ||
+        body.userId ||
+        ""
+      ).trim();
+
+    if (!targetUserId) {
+      return NextResponse.json(
+        {
+          error:
+            "ID-ul utilizatorului este obligatoriu.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 5. Citim utilizatorul țintă
+    // -----------------------------------------------
+
+    const {
+      data: targetProfile,
+      error: targetProfileError,
+    } =
+      await supabaseAdmin
+        .from("profiles")
+        .select(`
+          id,
+          full_name,
+          phone,
+          role,
+          team_id,
+          active
+        `)
+        .eq(
+          "id",
+          targetUserId
+        )
+        .single();
+
+    if (
+      targetProfileError ||
+      !targetProfile
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Utilizatorul nu a fost găsit.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 6. Verificăm Super Administratorul
+    // -----------------------------------------------
+
+    if (
+      targetProfile.role ===
+        "super_admin"
+    ) {
+      if (
+        currentProfile.role !==
+        "super_admin"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu poți modifica Super Administratorul.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      if (
+        targetUserId ===
+          currentUser.id &&
+        body.role !== undefined &&
+        body.role !==
+          "super_admin"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu îți poți schimba propriul rol de Super Administrator.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      if (
+        targetUserId ===
+          currentUser.id &&
+        body.active === false
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu îți poți dezactiva propriul cont de Super Administrator.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 7. Datele vechi
+    // -----------------------------------------------
+
+    const oldData = {
+      full_name:
+        targetProfile.full_name,
+
+      phone:
+        targetProfile.phone,
+
+      role:
+        targetProfile.role,
+
+      team_id:
+        targetProfile.team_id,
+
+      active:
+        targetProfile.active,
+    };
+
+    let newFullName =
+      targetProfile.full_name;
+
+    let newPhone =
+      targetProfile.phone;
+
+    let newRole =
+      targetProfile.role;
+
+    let newTeamId =
+      targetProfile.team_id;
+
+    let newActive =
+      targetProfile.active;
+
+    // -----------------------------------------------
+    // 8. NUME
+    // -----------------------------------------------
+
+    if (
+      body.fullName !==
+      undefined
+    ) {
+      newFullName =
+        String(
+          body.fullName || ""
+        ).trim();
+
+      if (!newFullName) {
+        return NextResponse.json(
+          {
+            error:
+              "Numele complet nu poate fi gol.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 9. TELEFON
+    // -----------------------------------------------
+
+    if (
+      body.phone !==
+      undefined
+    ) {
+      newPhone =
+        body.phone
+          ? String(
+              body.phone
+            ).trim()
+          : null;
+    }
+
+    // -----------------------------------------------
+    // 10. ROL
+    // -----------------------------------------------
+
+    if (
+      body.role !==
+      undefined
+    ) {
+      newRole =
+        String(
+          body.role
+        );
+
+      if (
+        newRole ===
+        "super_admin"
+      ) {
+        if (
+          targetProfile.role !==
+          "super_admin"
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Super Administrator nu poate fi atribuit altui utilizator.",
+            },
+            {
+              status: 403,
+            }
+          );
+        }
+      }
+
+      const allowedRoles = [
+        "administrator",
+        "manager",
+        "inginer",
+        "personal_teren",
+        "super_admin",
+      ];
+
+      if (
+        !allowedRoles.includes(
+          newRole
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Rol invalid.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      if (
+        currentProfile.role ===
+          "administrator" &&
+        newRole !==
+          targetProfile.role
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Administratorii nu pot modifica rolurile utilizatorilor.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 11. ECHIPĂ
+    // -----------------------------------------------
+
+    if (
+      body.teamId !==
+      undefined
+    ) {
+      newTeamId =
+        body.teamId
+          ? String(
+              body.teamId
+            )
+          : null;
+
+      if (newTeamId) {
+        const {
+          data: team,
+          error: teamError,
+        } =
+          await supabaseAdmin
+            .from("teams")
+            .select(
+              "id, name"
+            )
+            .eq(
+              "id",
+              newTeamId
+            )
+            .single();
+
+        if (
+          teamError ||
+          !team
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Echipa selectată nu există.",
+            },
+            {
+              status: 400,
+            }
+          );
+        }
+      }
+    }
+
+    // -----------------------------------------------
+    // 12. ACTIV / INACTIV
+    //
+    // IMPORTANT:
+    // Doar dacă valoarea chiar se schimbă,
+    // verificăm dreptul Super Administratorului.
+    // -----------------------------------------------
+
+    if (
+      body.active !==
+      undefined
+    ) {
+      const requestedActive =
+        Boolean(
+          body.active
+        );
+
+      const activeChanged =
+        requestedActive !==
+        targetProfile.active;
+
+      if (
+        activeChanged &&
+        currentProfile.role !==
+          "super_admin"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Doar Super Administratorul poate modifica statusul Activ/Inactiv.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      newActive =
+        requestedActive;
+    }
+
+    // -----------------------------------------------
+    // 13. ADMINISTRATORUL NU POATE MODIFICA
+    // SUPER ADMINISTRATORUL
+    // -----------------------------------------------
+
+    if (
+      currentProfile.role ===
+        "administrator" &&
+      targetProfile.role ===
+        "super_admin"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Administratorii nu pot modifica Super Administratorul.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 14. VERIFICĂM DACĂ EXISTĂ MODIFICĂRI
+    // -----------------------------------------------
+
+    const hasChanges =
+      newFullName !==
+        targetProfile.full_name ||
+      newPhone !==
+        targetProfile.phone ||
+      newRole !==
+        targetProfile.role ||
+      newTeamId !==
+        targetProfile.team_id ||
+      newActive !==
+        targetProfile.active;
+
+    if (!hasChanges) {
+      return NextResponse.json(
+        {
+          success: true,
+          message:
+            "Nu există modificări.",
+        },
+        {
+          status: 200,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 15. ACTUALIZĂM PROFILUL
+    // -----------------------------------------------
+
+    const {
+      data: updatedProfile,
+      error: updateError,
+    } =
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          full_name:
+            newFullName,
+
+          phone:
+            newPhone,
+
+          role:
+            newRole,
+
+          team_id:
+            newTeamId,
+
+          active:
+            newActive,
+
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          "id",
+          targetUserId
+        )
+        .select()
+        .single();
+
+    if (
+      updateError ||
+      !updatedProfile
+    ) {
+      console.error(
+        "UPDATE PROFILE ERROR:",
+        updateError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            updateError?.message ||
+            "Utilizatorul nu a putut fi modificat.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    // -----------------------------------------------
+    // 16. DATE NOI PENTRU AUDIT
+    // -----------------------------------------------
+
+    const newData = {
+      full_name:
+        updatedProfile.full_name,
+
+      phone:
+        updatedProfile.phone,
+
+      role:
+        updatedProfile.role,
+
+      team_id:
+        updatedProfile.team_id,
+
+      active:
+        updatedProfile.active,
+    };
+
+    // -----------------------------------------------
+    // 17. AUDIT — UPDATE GENERAL
+    // -----------------------------------------------
+
+    try {
+      await createAuditLog({
+        userId:
+          currentUser.id,
+
+        action:
+          "UPDATE",
+
+        entityType:
+          "USER",
+
+        entityId:
+          targetUserId,
+
+        entityName:
+          updatedProfile.full_name,
+
+        oldData,
+
+        newData,
+      });
+    } catch (auditError) {
+      console.error(
+        "UPDATE USER AUDIT LOG ERROR:",
+        auditError
+      );
+    }
+
+    // -----------------------------------------------
+    // 18. AUDIT — SCHIMBARE ROL
+    // -----------------------------------------------
+
+    if (
+      oldData.role !==
+      newData.role
+    ) {
+      try {
+        await createAuditLog({
+          userId:
+            currentUser.id,
+
+          action:
+            "ROLE_CHANGE",
+
+          entityType:
+            "USER",
+
+          entityId:
+            targetUserId,
+
+          entityName:
+            updatedProfile.full_name,
+
+          oldData: {
+            role:
+              oldData.role,
+          },
+
+          newData: {
+            role:
+              newData.role,
+          },
+        });
+      } catch (auditError) {
+        console.error(
+          "ROLE CHANGE AUDIT ERROR:",
+          auditError
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 19. AUDIT — SCHIMBARE ECHIPĂ
+    // -----------------------------------------------
+
+    if (
+      oldData.team_id !==
+      newData.team_id
+    ) {
+      try {
+        await createAuditLog({
+          userId:
+            currentUser.id,
+
+          action:
+            "TEAM_CHANGE",
+
+          entityType:
+            "USER",
+
+          entityId:
+            targetUserId,
+
+          entityName:
+            updatedProfile.full_name,
+
+          oldData: {
+            team_id:
+              oldData.team_id,
+          },
+
+          newData: {
+            team_id:
+              newData.team_id,
+          },
+        });
+      } catch (auditError) {
+        console.error(
+          "TEAM CHANGE AUDIT ERROR:",
+          auditError
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 20. AUDIT — ACTIV / INACTIV
+    // -----------------------------------------------
+
+    if (
+      oldData.active !==
+      newData.active
+    ) {
+      try {
+        await createAuditLog({
+          userId:
+            currentUser.id,
+
+          action:
+            "STATUS_CHANGE",
+
+          entityType:
+            "USER",
+
+          entityId:
+            targetUserId,
+
+          entityName:
+            updatedProfile.full_name,
+
+          oldData: {
+            active:
+              oldData.active,
+          },
+
+          newData: {
+            active:
+              newData.active,
+          },
+        });
+      } catch (auditError) {
+        console.error(
+          "STATUS CHANGE AUDIT ERROR:",
+          auditError
+        );
+      }
+    }
+
+    // -----------------------------------------------
+    // 21. RĂSPUNS
+    // -----------------------------------------------
+
+    return NextResponse.json(
+      {
+        success: true,
+
+        user: {
+          id:
+            updatedProfile.id,
+
+          full_name:
+            updatedProfile.full_name,
+
+          phone:
+            updatedProfile.phone,
+
+          role:
+            updatedProfile.role,
+
+          team_id:
+            updatedProfile.team_id,
+
+          active:
+            updatedProfile.active,
+        },
+      },
+      {
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "UPDATE USER ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "A apărut o eroare la modificarea utilizatorului.",
       },
       {
         status: 500,

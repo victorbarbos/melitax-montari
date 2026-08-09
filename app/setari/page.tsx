@@ -68,33 +68,102 @@ const getRoleLabel = (
 };
 
 export default function Setari() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  // ==================================================
+  // UTILIZATORI
+  // ==================================================
 
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [users, setUsers] =
+    useState<UserProfile[]>([]);
 
-  const [loading, setLoading] = useState(true);
+  const [teams, setTeams] =
+    useState<Team[]>([]);
 
-  const [error, setError] = useState("");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [showAddUser, setShowAddUser] = useState(false);
+  const [error, setError] =
+    useState("");
 
-  const [creatingUser, setCreatingUser] = useState(false);
+  // ==================================================
+  // UTILIZATOR CURENT
+  // ==================================================
 
-  const [formError, setFormError] = useState("");
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
 
-  const [formSuccess, setFormSuccess] = useState("");
+  const [currentUserRole, setCurrentUserRole] =
+    useState<string | null>(null);
 
-  const [newName, setNewName] = useState("");
+  const [loadingCurrentUser, setLoadingCurrentUser] =
+    useState(true);
 
-  const [newPhone, setNewPhone] = useState("");
+  // ==================================================
+  // CREARE UTILIZATOR
+  // ==================================================
 
-  const [newEmail, setNewEmail] = useState("");
+  const [showAddUser, setShowAddUser] =
+    useState(false);
 
-  const [newPassword, setNewPassword] = useState("");
+  const [creatingUser, setCreatingUser] =
+    useState(false);
 
-  const [newRole, setNewRole] = useState("personal_teren");
+  const [formError, setFormError] =
+    useState("");
 
-  const [newTeam, setNewTeam] = useState("");
+  const [formSuccess, setFormSuccess] =
+    useState("");
+
+  const [newName, setNewName] =
+    useState("");
+
+  const [newPhone, setNewPhone] =
+    useState("");
+
+  const [newEmail, setNewEmail] =
+    useState("");
+
+  const [newPassword, setNewPassword] =
+    useState("");
+
+  const [newRole, setNewRole] =
+    useState("personal_teren");
+
+  const [newTeam, setNewTeam] =
+    useState("");
+
+  // ==================================================
+  // EDITARE UTILIZATOR
+  // ==================================================
+
+  const [showEditUser, setShowEditUser] =
+    useState(false);
+
+  const [editingUser, setEditingUser] =
+    useState<UserProfile | null>(null);
+
+  const [editingName, setEditingName] =
+    useState("");
+
+  const [editingPhone, setEditingPhone] =
+    useState("");
+
+  const [editingRole, setEditingRole] =
+    useState("");
+
+  const [editingTeam, setEditingTeam] =
+    useState("");
+
+  const [editingActive, setEditingActive] =
+    useState(true);
+
+  const [savingUser, setSavingUser] =
+    useState(false);
+
+  const [editError, setEditError] =
+    useState("");
+
+  const [editSuccess, setEditSuccess] =
+    useState("");
 
   // ==================================================
   // ÎNCĂRCARE UTILIZATORI
@@ -105,15 +174,22 @@ export default function Setari() {
     setError("");
 
     try {
-      const response = await fetch("/api/admin/users", {
-        method: "GET",
-        cache: "no-store",
-      });
+      const response = await fetch(
+        "/api/admin/users",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
-      const result = await response.json();
+      const result =
+        await response.json();
 
       if (!response.ok) {
-        console.error("LOAD USERS API ERROR:", result);
+        console.error(
+          "LOAD USERS API ERROR:",
+          result
+        );
 
         setError(
           result.error ||
@@ -125,9 +201,14 @@ export default function Setari() {
         return;
       }
 
-      setUsers(result.users || []);
+      setUsers(
+        result.users || []
+      );
     } catch (error) {
-      console.error("LOAD USERS ERROR:", error);
+      console.error(
+        "LOAD USERS ERROR:",
+        error
+      );
 
       setError(
         "Nu am putut comunica cu serverul."
@@ -147,17 +228,96 @@ export default function Setari() {
     const {
       data,
       error,
-    } = await supabase
-      .from("teams")
-      .select("id, name")
-      .order("name");
+    } =
+      await supabase
+        .from("teams")
+        .select(
+          "id, name"
+        )
+        .order("name");
 
     if (error) {
-      console.error("LOAD TEAMS ERROR:", error);
+      console.error(
+        "LOAD TEAMS ERROR:",
+        error
+      );
+
       return;
     }
 
-    setTeams(data || []);
+    setTeams(
+      data || []
+    );
+  };
+
+  // ==================================================
+  // UTILIZATOR CURENT
+  // ==================================================
+
+  const loadCurrentUser = async () => {
+    setLoadingCurrentUser(true);
+
+    try {
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth.getUser();
+
+      if (
+        error ||
+        !data.user
+      ) {
+        console.error(
+          "CURRENT USER ERROR:",
+          error
+        );
+
+        return;
+      }
+
+      setCurrentUserId(
+        data.user.id
+      );
+
+      const {
+        data: profile,
+        error: profileError,
+      } =
+        await supabase
+          .from("profiles")
+          .select(
+            "role, active"
+          )
+          .eq(
+            "id",
+            data.user.id
+          )
+          .single();
+
+      if (
+        profileError ||
+        !profile
+      ) {
+        console.error(
+          "CURRENT PROFILE ERROR:",
+          profileError
+        );
+
+        return;
+      }
+
+      setCurrentUserRole(
+        profile.role
+      );
+    } catch (error) {
+      console.error(
+        "LOAD CURRENT USER ERROR:",
+        error
+      );
+    } finally {
+      setLoadingCurrentUser(false);
+    }
   };
 
   // ==================================================
@@ -167,10 +327,11 @@ export default function Setari() {
   useEffect(() => {
     loadUsers();
     loadTeams();
+    loadCurrentUser();
   }, []);
 
   // ==================================================
-  // RESET FORMULAR
+  // RESET FORMULAR CREARE
   // ==================================================
 
   const resetForm = () => {
@@ -178,14 +339,16 @@ export default function Setari() {
     setNewPhone("");
     setNewEmail("");
     setNewPassword("");
-    setNewRole("personal_teren");
+    setNewRole(
+      "personal_teren"
+    );
     setNewTeam("");
     setFormError("");
     setFormSuccess("");
   };
 
   // ==================================================
-  // ÎNCHIDERE FORMULAR
+  // ÎNCHIDERE FORMULAR CREARE
   // ==================================================
 
   const closeAddUser = () => {
@@ -202,110 +365,482 @@ export default function Setari() {
   // CREARE UTILIZATOR
   // ==================================================
 
-  const handleCreateUser = async () => {
-    setFormError("");
-    setFormSuccess("");
+  const handleCreateUser =
+    async () => {
+      setFormError("");
+      setFormSuccess("");
 
-    if (!newName.trim()) {
-      setFormError(
-        "Numele complet este obligatoriu."
-      );
-
-      return;
-    }
-
-    if (!newEmail.trim()) {
-      setFormError(
-        "Emailul este obligatoriu."
-      );
-
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setFormError(
-        "Parola trebuie să conțină cel puțin 8 caractere."
-      );
-
-      return;
-    }
-
-    // Super Administrator nu poate fi creat
-    if (newRole === "super_admin") {
-      setFormError(
-        "Super Administrator nu poate fi creat."
-      );
-
-      return;
-    }
-
-    setCreatingUser(true);
-
-    try {
-      const response = await fetch(
-        "/api/admin/users",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            fullName: newName.trim(),
-
-            phone: newPhone.trim(),
-
-            email: newEmail
-              .trim()
-              .toLowerCase(),
-
-            password: newPassword,
-
-            role: newRole,
-
-            teamId: newTeam || null,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (
+        !newName.trim()
+      ) {
         setFormError(
-          result.error ||
-            "Utilizatorul nu a putut fi creat."
+          "Numele complet este obligatoriu."
         );
-
-        setCreatingUser(false);
 
         return;
       }
 
-      setFormSuccess(
-        "Utilizatorul a fost creat cu succes."
-      );
+      if (
+        !newEmail.trim()
+      ) {
+        setFormError(
+          "Emailul este obligatoriu."
+        );
 
-      await loadUsers();
+        return;
+      }
 
-      setTimeout(() => {
-        setShowAddUser(false);
+      if (
+        newPassword.length < 8
+      ) {
+        setFormError(
+          "Parola trebuie să conțină cel puțin 8 caractere."
+        );
 
-        resetForm();
-      }, 1000);
-    } catch (error) {
-      console.error(
-        "CREATE USER FRONTEND ERROR:",
-        error
-      );
+        return;
+      }
 
-      setFormError(
-        "Nu am putut comunica cu serverul."
-      );
-    } finally {
-      setCreatingUser(false);
-    }
+      if (
+        newRole ===
+        "super_admin"
+      ) {
+        setFormError(
+          "Super Administrator nu poate fi creat."
+        );
+
+        return;
+      }
+
+      setCreatingUser(true);
+
+      try {
+        const response =
+          await fetch(
+            "/api/admin/users",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                fullName:
+                  newName.trim(),
+
+                phone:
+                  newPhone.trim(),
+
+                email:
+                  newEmail
+                    .trim()
+                    .toLowerCase(),
+
+                password:
+                  newPassword,
+
+                role:
+                  newRole,
+
+                teamId:
+                  newTeam ||
+                  null,
+              }),
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          setFormError(
+            result.error ||
+              "Utilizatorul nu a putut fi creat."
+          );
+
+          return;
+        }
+
+        setFormSuccess(
+          "Utilizatorul a fost creat cu succes."
+        );
+
+        await loadUsers();
+
+        setTimeout(() => {
+          setShowAddUser(
+            false
+          );
+
+          resetForm();
+        }, 1000);
+      } catch (error) {
+        console.error(
+          "CREATE USER FRONTEND ERROR:",
+          error
+        );
+
+        setFormError(
+          "Nu am putut comunica cu serverul."
+        );
+      } finally {
+        setCreatingUser(
+          false
+        );
+      }
+    };
+
+  // ==================================================
+  // DESCHIDE EDITARE
+  // ==================================================
+
+  const openEditUser = (
+    user: UserProfile
+  ) => {
+    setEditingUser(user);
+
+    setEditingName(
+      user.full_name
+    );
+
+    setEditingPhone(
+      user.phone || ""
+    );
+
+    setEditingRole(
+      user.role
+    );
+
+    setEditingTeam(
+      user.team_id || ""
+    );
+
+    setEditingActive(
+      Boolean(user.active)
+    );
+
+    setEditError("");
+    setEditSuccess("");
+
+    setShowEditUser(
+      true
+    );
   };
+
+  // ==================================================
+  // ÎNCHIDE EDITARE
+  // ==================================================
+
+  const closeEditUser = () => {
+    if (savingUser) {
+      return;
+    }
+
+    setShowEditUser(
+      false
+    );
+
+    setEditingUser(
+      null
+    );
+
+    setEditingName("");
+    setEditingPhone("");
+    setEditingRole("");
+    setEditingTeam("");
+    setEditingActive(true);
+
+    setEditError("");
+    setEditSuccess("");
+  };
+
+  // ==================================================
+  // SALVARE EDITARE
+  // ==================================================
+
+  const handleSaveUser =
+    async () => {
+      if (!editingUser) {
+        return;
+      }
+
+      setEditError("");
+      setEditSuccess("");
+
+      // ----------------------------------------------
+      // VALORI ORIGINALE
+      // ----------------------------------------------
+
+      const originalName =
+        editingUser.full_name;
+
+      const originalPhone =
+        editingUser.phone ||
+        "";
+
+      const originalRole =
+        editingUser.role;
+
+      const originalTeam =
+        editingUser.team_id ||
+        "";
+
+      const originalActive =
+        Boolean(
+          editingUser.active
+        );
+
+      // ----------------------------------------------
+      // VALORI NOI
+      // ----------------------------------------------
+
+      const newNameValue =
+        editingName.trim();
+
+      const newPhoneValue =
+        editingPhone.trim();
+
+      const newRoleValue =
+        editingRole;
+
+      const newTeamValue =
+        editingTeam;
+
+      const newActiveValue =
+        Boolean(
+          editingActive
+        );
+
+      // ----------------------------------------------
+      // VERIFICĂM DACĂ EXISTĂ MODIFICĂRI
+      // ----------------------------------------------
+
+      const hasChanges =
+        newNameValue !==
+          originalName ||
+        newPhoneValue !==
+          originalPhone ||
+        newRoleValue !==
+          originalRole ||
+        newTeamValue !==
+          originalTeam ||
+        newActiveValue !==
+          originalActive;
+
+      // ----------------------------------------------
+      // IMPORTANT:
+      // dacă NU există modificări,
+      // NU verificăm permisiunile de modificare.
+      // ----------------------------------------------
+
+      if (!hasChanges) {
+        setEditSuccess(
+          "Nu există modificări."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // VALIDARE NUME
+      // ----------------------------------------------
+
+      if (!newNameValue) {
+        setEditError(
+          "Numele complet este obligatoriu."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // ADMINISTRATOR → NU POATE MODIFICA
+      // SUPER ADMINISTRATOR
+      // ----------------------------------------------
+
+      if (
+        currentUserRole ===
+          "administrator" &&
+        editingUser.role ===
+          "super_admin"
+      ) {
+        setEditError(
+          "Administratorii nu pot modifica Super Administratorul."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // ADMINISTRATOR → NU POATE SCHIMBA ROLUL
+      // ----------------------------------------------
+
+      if (
+        currentUserRole ===
+          "administrator" &&
+        newRoleValue !==
+          originalRole
+      ) {
+        setEditError(
+          "Administratorii nu pot modifica rolurile utilizatorilor."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // DOAR SUPER ADMIN → STATUS
+      // ----------------------------------------------
+
+      if (
+        currentUserRole !==
+          "super_admin" &&
+        newActiveValue !==
+          originalActive
+      ) {
+        setEditError(
+          "Doar Super Administratorul poate modifica statusul Activ/Inactiv."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // NIMENI NU POATE CREA SUPER ADMIN
+      // PRIN MODIFICAREA UNUI USER
+      // ----------------------------------------------
+
+      if (
+        newRoleValue ===
+          "super_admin" &&
+        originalRole !==
+          "super_admin"
+      ) {
+        setEditError(
+          "Super Administrator nu poate fi atribuit altui utilizator."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // SUPER ADMIN NU ÎȘI POATE SCHIMBA ROLUL
+      // ----------------------------------------------
+
+      if (
+        editingUser.id ===
+          currentUserId &&
+        originalRole ===
+          "super_admin" &&
+        newRoleValue !==
+          "super_admin"
+      ) {
+        setEditError(
+          "Nu îți poți schimba propriul rol de Super Administrator."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // SUPER ADMIN NU SE POATE DEZACTIVA
+      // ----------------------------------------------
+
+      if (
+        editingUser.id ===
+          currentUserId &&
+        originalRole ===
+          "super_admin" &&
+        newActiveValue ===
+          false
+      ) {
+        setEditError(
+          "Nu îți poți dezactiva propriul cont de Super Administrator."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------------
+      // SALVARE
+      // ----------------------------------------------
+
+      setSavingUser(
+        true
+      );
+
+      try {
+        const response =
+          await fetch(
+            "/api/admin/users",
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                id:
+                  editingUser.id,
+
+                fullName:
+                  newNameValue,
+
+                phone:
+                  newPhoneValue,
+
+                role:
+                  newRoleValue,
+
+                teamId:
+                  newTeamValue ||
+                  null,
+
+                active:
+                  newActiveValue,
+              }),
+            }
+          );
+
+        const result =
+          await response.json();
+
+        if (!response.ok) {
+          setEditError(
+            result.error ||
+              "Utilizatorul nu a putut fi modificat."
+          );
+
+          return;
+        }
+
+        setEditSuccess(
+          "Utilizatorul a fost modificat cu succes."
+        );
+
+        await loadUsers();
+
+        setTimeout(() => {
+          closeEditUser();
+        }, 800);
+      } catch (error) {
+        console.error(
+          "UPDATE USER FRONTEND ERROR:",
+          error
+        );
+
+        setEditError(
+          "Nu am putut comunica cu serverul."
+        );
+      } finally {
+        setSavingUser(
+          false
+        );
+      }
+    };
 
   // ==================================================
   // RENDER
@@ -324,9 +859,9 @@ export default function Setari() {
 
           <div className="mt-6">
 
-            {/* ========================================
+            {/* ==================================================
                 TITLU
-            ======================================== */}
+            ================================================== */}
 
             <div className="rounded-xl bg-white p-6 shadow-sm">
 
@@ -340,9 +875,9 @@ export default function Setari() {
 
             </div>
 
-            {/* ========================================
+            {/* ==================================================
                 UTILIZATORI
-            ======================================== */}
+            ================================================== */}
 
             <div className="mt-6 rounded-xl bg-white shadow-sm">
 
@@ -363,9 +898,17 @@ export default function Setari() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowAddUser(true);
-                    setFormError("");
-                    setFormSuccess("");
+                    setShowAddUser(
+                      true
+                    );
+
+                    setFormError(
+                      ""
+                    );
+
+                    setFormSuccess(
+                      ""
+                    );
                   }}
                   className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                 >
@@ -374,9 +917,9 @@ export default function Setari() {
 
               </div>
 
-              {/* ======================================
-                  FORMULAR ADAUGARE
-              ====================================== */}
+              {/* ==================================================
+                  FORMULAR CREARE
+              ================================================== */}
 
               {showAddUser && (
                 <div className="border-b border-gray-100 bg-gray-50 p-5 sm:p-6">
@@ -399,8 +942,12 @@ export default function Setari() {
 
                       <button
                         type="button"
-                        onClick={closeAddUser}
-                        disabled={creatingUser}
+                        onClick={
+                          closeAddUser
+                        }
+                        disabled={
+                          creatingUser
+                        }
                         className="rounded-lg px-2 py-1 text-2xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
                       >
                         ×
@@ -410,8 +957,6 @@ export default function Setari() {
 
                     <div className="grid gap-5 md:grid-cols-2">
 
-                      {/* NUME */}
-
                       <div>
 
                         <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -420,20 +965,21 @@ export default function Setari() {
 
                         <input
                           type="text"
-                          value={newName}
+                          value={
+                            newName
+                          }
                           onChange={(event) =>
                             setNewName(
                               event.target.value
                             )
                           }
-                          placeholder="Ex. Ion Popescu"
-                          disabled={creatingUser}
+                          disabled={
+                            creatingUser
+                          }
                           className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
                         />
 
                       </div>
-
-                      {/* TELEFON */}
 
                       <div>
 
@@ -443,20 +989,21 @@ export default function Setari() {
 
                         <input
                           type="tel"
-                          value={newPhone}
+                          value={
+                            newPhone
+                          }
                           onChange={(event) =>
                             setNewPhone(
                               event.target.value
                             )
                           }
-                          placeholder="Ex. 069123456"
-                          disabled={creatingUser}
+                          disabled={
+                            creatingUser
+                          }
                           className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
                         />
 
                       </div>
-
-                      {/* EMAIL */}
 
                       <div>
 
@@ -466,20 +1013,21 @@ export default function Setari() {
 
                         <input
                           type="email"
-                          value={newEmail}
+                          value={
+                            newEmail
+                          }
                           onChange={(event) =>
                             setNewEmail(
                               event.target.value
                             )
                           }
-                          placeholder="email@melitax.md"
-                          disabled={creatingUser}
+                          disabled={
+                            creatingUser
+                          }
                           className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
                         />
 
                       </div>
-
-                      {/* PAROLA */}
 
                       <div>
 
@@ -489,20 +1037,22 @@ export default function Setari() {
 
                         <input
                           type="password"
-                          value={newPassword}
+                          value={
+                            newPassword
+                          }
                           onChange={(event) =>
                             setNewPassword(
                               event.target.value
                             )
                           }
+                          disabled={
+                            creatingUser
+                          }
                           placeholder="Minimum 8 caractere"
-                          disabled={creatingUser}
                           className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
                         />
 
                       </div>
-
-                      {/* ROL */}
 
                       <div>
 
@@ -511,14 +1061,18 @@ export default function Setari() {
                         </label>
 
                         <select
-                          value={newRole}
+                          value={
+                            newRole
+                          }
                           onChange={(event) =>
                             setNewRole(
                               event.target.value
                             )
                           }
-                          disabled={creatingUser}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                          disabled={
+                            creatingUser
+                          }
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none disabled:bg-gray-100"
                         >
 
                           <option value="personal_teren">
@@ -541,8 +1095,6 @@ export default function Setari() {
 
                       </div>
 
-                      {/* ECHIPĂ */}
-
                       <div>
 
                         <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -550,28 +1102,40 @@ export default function Setari() {
                         </label>
 
                         <select
-                          value={newTeam}
+                          value={
+                            newTeam
+                          }
                           onChange={(event) =>
                             setNewTeam(
                               event.target.value
                             )
                           }
-                          disabled={creatingUser}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                          disabled={
+                            creatingUser
+                          }
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none disabled:bg-gray-100"
                         >
 
                           <option value="">
                             Fără echipă
                           </option>
 
-                          {teams.map((team) => (
-                            <option
-                              key={team.id}
-                              value={team.id}
-                            >
-                              {team.name}
-                            </option>
-                          ))}
+                          {teams.map(
+                            (team) => (
+                              <option
+                                key={
+                                  team.id
+                                }
+                                value={
+                                  team.id
+                                }
+                              >
+                                {
+                                  team.name
+                                }
+                              </option>
+                            )
+                          )}
 
                         </select>
 
@@ -579,40 +1143,46 @@ export default function Setari() {
 
                     </div>
 
-                    {/* EROARE */}
-
                     {formError && (
                       <div className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-                        {formError}
+                        {
+                          formError
+                        }
                       </div>
                     )}
-
-                    {/* SUCCES */}
 
                     {formSuccess && (
                       <div className="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-                        {formSuccess}
+                        {
+                          formSuccess
+                        }
                       </div>
                     )}
-
-                    {/* BUTOANE */}
 
                     <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
 
                       <button
                         type="button"
-                        onClick={closeAddUser}
-                        disabled={creatingUser}
-                        className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        onClick={
+                          closeAddUser
+                        }
+                        disabled={
+                          creatingUser
+                        }
+                        className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                       >
                         Anulează
                       </button>
 
                       <button
                         type="button"
-                        onClick={handleCreateUser}
-                        disabled={creatingUser}
-                        className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={
+                          handleCreateUser
+                        }
+                        disabled={
+                          creatingUser
+                        }
+                        className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
                       >
                         {creatingUser
                           ? "Se creează..."
@@ -626,9 +1196,345 @@ export default function Setari() {
                 </div>
               )}
 
-              {/* ======================================
+              {/* ==================================================
+                  FORMULAR EDITARE
+              ================================================== */}
+
+              {showEditUser &&
+                editingUser && (
+                  <div className="border-b border-gray-100 bg-gray-50 p-5 sm:p-6">
+
+                    <div className="rounded-xl bg-white p-5 shadow-sm sm:p-6">
+
+                      <div className="mb-6 flex items-start justify-between">
+
+                        <div>
+
+                          <h3 className="text-lg font-bold text-gray-900">
+                            Editează utilizator
+                          </h3>
+
+                          <p className="mt-1 text-sm text-gray-500">
+                            Modifică datele utilizatorului.
+                          </p>
+
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={
+                            closeEditUser
+                          }
+                          disabled={
+                            savingUser
+                          }
+                          className="rounded-lg px-2 py-1 text-2xl text-gray-500 hover:bg-gray-100"
+                        >
+                          ×
+                        </button>
+
+                      </div>
+
+                      <div className="grid gap-5 md:grid-cols-2">
+
+                        {/* NUME */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Nume complet
+                          </label>
+
+                          <input
+                            type="text"
+                            value={
+                              editingName
+                            }
+                            onChange={(event) =>
+                              setEditingName(
+                                event.target.value
+                              )
+                            }
+                            disabled={
+                              savingUser
+                            }
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                          />
+
+                        </div>
+
+                        {/* TELEFON */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Telefon
+                          </label>
+
+                          <input
+                            type="tel"
+                            value={
+                              editingPhone
+                            }
+                            onChange={(event) =>
+                              setEditingPhone(
+                                event.target.value
+                              )
+                            }
+                            disabled={
+                              savingUser
+                            }
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                          />
+
+                        </div>
+
+                        {/* EMAIL */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Email
+                          </label>
+
+                          <input
+                            type="email"
+                            value={
+                              editingUser.email ||
+                              ""
+                            }
+                            readOnly
+                            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500"
+                          />
+
+                          <p className="mt-1 text-xs text-gray-400">
+                            Emailul nu se modifică în acest pas.
+                          </p>
+
+                        </div>
+
+                        {/* ROL */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Rol
+                          </label>
+
+                          <select
+                            value={
+                              editingRole
+                            }
+                            onChange={(event) =>
+                              setEditingRole(
+                                event.target.value
+                              )
+                            }
+                            disabled={
+                              savingUser ||
+                              loadingCurrentUser ||
+                              currentUserRole !==
+                                "super_admin" ||
+                              editingUser.role ===
+                                "super_admin"
+                            }
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none disabled:bg-gray-100"
+                          >
+
+                            <option value="personal_teren">
+                              Personal teren
+                            </option>
+
+                            <option value="inginer">
+                              Inginer
+                            </option>
+
+                            <option value="manager">
+                              Manager
+                            </option>
+
+                            <option value="administrator">
+                              Administrator
+                            </option>
+
+                            <option value="super_admin">
+                              Super Administrator
+                            </option>
+
+                          </select>
+
+                          {currentUserRole !==
+                            "super_admin" && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              Doar Super Administratorul poate modifica rolurile.
+                            </p>
+                          )}
+
+                        </div>
+
+                        {/* ECHIPĂ */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Echipă
+                          </label>
+
+                          <select
+                            value={
+                              editingTeam
+                            }
+                            onChange={(event) =>
+                              setEditingTeam(
+                                event.target.value
+                              )
+                            }
+                            disabled={
+                              savingUser
+                            }
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none disabled:bg-gray-100"
+                          >
+
+                            <option value="">
+                              Fără echipă
+                            </option>
+
+                            {teams.map(
+                              (team) => (
+                                <option
+                                  key={
+                                    team.id
+                                  }
+                                  value={
+                                    team.id
+                                  }
+                                >
+                                  {
+                                    team.name
+                                  }
+                                </option>
+                              )
+                            )}
+
+                          </select>
+
+                        </div>
+
+                        {/* STATUS */}
+
+                        <div>
+
+                          <label className="mb-2 block text-sm font-medium text-gray-700">
+                            Status cont
+                          </label>
+
+                          <select
+                            value={
+                              editingActive
+                                ? "active"
+                                : "inactive"
+                            }
+                            onChange={(event) =>
+                              setEditingActive(
+                                event.target.value ===
+                                  "active"
+                              )
+                            }
+                            disabled={
+                              savingUser ||
+                              loadingCurrentUser ||
+                              currentUserRole !==
+                                "super_admin" ||
+                              editingUser.id ===
+                                currentUserId
+                            }
+                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none disabled:bg-gray-100"
+                          >
+
+                            <option value="active">
+                              Activ
+                            </option>
+
+                            <option value="inactive">
+                              Inactiv
+                            </option>
+
+                          </select>
+
+                          {currentUserRole !==
+                            "super_admin" && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              Doar Super Administratorul poate modifica acest status.
+                            </p>
+                          )}
+
+                          {editingUser.id ===
+                            currentUserId && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              Contul tău nu poate fi dezactivat.
+                            </p>
+                          )}
+
+                        </div>
+
+                      </div>
+
+                      {editError && (
+                        <div className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                          {
+                            editError
+                          }
+                        </div>
+                      )}
+
+                      {editSuccess && (
+                        <div className="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                          {
+                            editSuccess
+                          }
+                        </div>
+                      )}
+
+                      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+
+                        <button
+                          type="button"
+                          onClick={
+                            closeEditUser
+                          }
+                          disabled={
+                            savingUser
+                          }
+                          className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Anulează
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={
+                            handleSaveUser
+                          }
+                          disabled={
+                            savingUser
+                          }
+                          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                          {savingUser
+                            ? "Se salvează..."
+                            : "Salvează modificările"}
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+                )}
+
+              {/* ==================================================
                   LOADING
-              ====================================== */}
+              ================================================== */}
 
               {loading && (
                 <div className="p-8 text-center text-sm text-gray-500">
@@ -636,99 +1542,245 @@ export default function Setari() {
                 </div>
               )}
 
-              {/* ======================================
+              {/* ==================================================
                   EROARE
-              ====================================== */}
+              ================================================== */}
 
-              {!loading && error && (
-                <div className="p-6">
+              {!loading &&
+                error && (
+                  <div className="p-6">
 
-                  <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
-                    {error}
+                    <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                      {error}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        loadUsers
+                      }
+                      className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Încearcă din nou
+                    </button>
+
                   </div>
+                )}
 
-                  <button
-                    type="button"
-                    onClick={loadUsers}
-                    className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Încearcă din nou
-                  </button>
+              {/* ==================================================
+                  LISTA DESKTOP
+              ================================================== */}
 
-                </div>
-              )}
+              {!loading &&
+                !error && (
+                  <>
 
-              {/* ======================================
-                  LISTA
-              ====================================== */}
+                    <div className="hidden overflow-x-auto md:block">
 
-              {!loading && !error && (
-                <>
+                      <table className="w-full">
 
-                  {/* DESKTOP */}
+                        <thead>
 
-                  <div className="hidden overflow-x-auto md:block">
+                          <tr className="border-b border-gray-100 text-left">
 
-                    <table className="w-full">
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Utilizator
+                            </th>
 
-                      <thead>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Telefon
+                            </th>
 
-                        <tr className="border-b border-gray-100 text-left">
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Rol
+                            </th>
 
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Utilizator
-                          </th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Echipă
+                            </th>
 
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Telefon
-                          </th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Status
+                            </th>
 
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Rol
-                          </th>
+                            <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Acțiuni
+                            </th>
 
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Echipă
-                          </th>
+                          </tr>
 
-                          <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Status
-                          </th>
+                        </thead>
 
-                          <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Acțiuni
-                          </th>
+                        <tbody>
 
-                        </tr>
+                          {users.map(
+                            (user) => (
+                              <tr
+                                key={
+                                  user.id
+                                }
+                                className="border-b border-gray-100 last:border-0"
+                              >
 
-                      </thead>
+                                <td className="px-6 py-4">
 
-                      <tbody>
+                                  <div className="flex items-center gap-3">
 
-                        {users.map((user) => (
-                          <tr
-                            key={user.id}
-                            className="border-b border-gray-100 last:border-0"
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
+
+                                      <span className="text-sm font-semibold text-gray-700">
+
+                                        {user.full_name
+                                          .split(
+                                            " "
+                                          )
+                                          .map(
+                                            (name) =>
+                                              name[0]
+                                          )
+                                          .slice(
+                                            0,
+                                            2
+                                          )
+                                          .join(
+                                            ""
+                                          )
+                                          .toUpperCase()}
+
+                                      </span>
+
+                                    </div>
+
+                                    <div className="min-w-0">
+
+                                      <p className="font-medium text-gray-900">
+                                        {
+                                          user.full_name
+                                        }
+                                      </p>
+
+                                      <p className="truncate text-sm text-gray-500">
+                                        {user.email ||
+                                          "Email nespecificat"}
+                                      </p>
+
+                                    </div>
+
+                                  </div>
+
+                                </td>
+
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                  {user.phone ||
+                                    "—"}
+                                </td>
+
+                                <td className="px-6 py-4">
+
+                                  <span className="inline-flex rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
+                                    {getRoleLabel(
+                                      user.role,
+                                      user
+                                        .teams
+                                        ?.name
+                                    )}
+                                  </span>
+
+                                </td>
+
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                  {user
+                                    .teams
+                                    ?.name ||
+                                    "—"}
+                                </td>
+
+                                <td className="px-6 py-4">
+
+                                  {user.active ? (
+                                    <span className="inline-flex items-center gap-2 text-sm font-medium text-green-600">
+
+                                      <span className="h-2 w-2 rounded-full bg-green-500" />
+
+                                      Activ
+
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-500">
+
+                                      <span className="h-2 w-2 rounded-full bg-gray-400" />
+
+                                      Inactiv
+
+                                    </span>
+                                  )}
+
+                                </td>
+
+                                <td className="px-6 py-4 text-right">
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openEditUser(
+                                        user
+                                      )
+                                    }
+                                    className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                  >
+                                    Editează
+                                  </button>
+
+                                </td>
+
+                              </tr>
+                            )
+                          )}
+
+                        </tbody>
+
+                      </table>
+
+                    </div>
+
+                    {/* ==================================================
+                        LISTA MOBIL
+                    ================================================== */}
+
+                    <div className="divide-y divide-gray-100 md:hidden">
+
+                      {users.map(
+                        (user) => (
+                          <div
+                            key={
+                              user.id
+                            }
+                            className="p-5"
                           >
 
-                            {/* UTILIZATOR */}
-
-                            <td className="px-6 py-4">
+                            <div className="flex items-start justify-between gap-3">
 
                               <div className="flex items-center gap-3">
 
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-200">
 
                                   <span className="text-sm font-semibold text-gray-700">
 
                                     {user.full_name
-                                      .split(" ")
+                                      .split(
+                                        " "
+                                      )
                                       .map(
                                         (name) =>
                                           name[0]
                                       )
-                                      .slice(0, 2)
-                                      .join("")
+                                      .slice(
+                                        0,
+                                        2
+                                      )
+                                      .join(
+                                        ""
+                                      )
                                       .toUpperCase()}
 
                                   </span>
@@ -738,7 +1790,9 @@ export default function Setari() {
                                 <div className="min-w-0">
 
                                   <p className="font-medium text-gray-900">
-                                    {user.full_name}
+                                    {
+                                      user.full_name
+                                    }
                                   </p>
 
                                   <p className="truncate text-sm text-gray-500">
@@ -750,196 +1804,82 @@ export default function Setari() {
 
                               </div>
 
-                            </td>
-
-                            {/* TELEFON */}
-
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {user.phone || "—"}
-                            </td>
-
-                            {/* ROL */}
-
-                            <td className="px-6 py-4">
-
-                              <span className="inline-flex rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-
-                                {getRoleLabel(
-                                  user.role,
-                                  user.teams?.name
-                                )}
-
-                              </span>
-
-                            </td>
-
-                            {/* ECHIPĂ */}
-
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {user.teams?.name || "—"}
-                            </td>
-
-                            {/* STATUS */}
-
-                            <td className="px-6 py-4">
-
                               {user.active ? (
-                                <span className="inline-flex items-center gap-2 text-sm font-medium text-green-600">
-
-                                  <span className="h-2 w-2 rounded-full bg-green-500" />
-
+                                <span className="shrink-0 text-sm font-medium text-green-600">
                                   Activ
-
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-500">
-
-                                  <span className="h-2 w-2 rounded-full bg-gray-400" />
-
+                                <span className="shrink-0 text-sm font-medium text-gray-500">
                                   Inactiv
-
                                 </span>
                               )}
 
-                            </td>
+                            </div>
 
-                            {/* ACȚIUNI */}
+                            <div className="mt-4 grid grid-cols-2 gap-3">
 
-                            <td className="px-6 py-4 text-right">
+                              <div className="rounded-lg bg-gray-50 p-3">
 
-                              <button
-                                type="button"
-                                className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                              >
-                                Editează
-                              </button>
+                                <p className="text-xs text-gray-500">
+                                  Rol
+                                </p>
 
-                            </td>
+                                <p className="mt-1 text-sm font-medium text-gray-900">
+                                  {getRoleLabel(
+                                    user.role,
+                                    user
+                                      .teams
+                                      ?.name
+                                  )}
+                                </p>
 
-                          </tr>
-                        ))}
+                              </div>
 
-                      </tbody>
+                              <div className="rounded-lg bg-gray-50 p-3">
 
-                    </table>
+                                <p className="text-xs text-gray-500">
+                                  Echipă
+                                </p>
 
-                  </div>
+                                <p className="mt-1 text-sm font-medium text-gray-900">
+                                  {user
+                                    .teams
+                                    ?.name ||
+                                    "—"}
+                                </p>
 
-                  {/* MOBIL */}
-
-                  <div className="divide-y divide-gray-100 md:hidden">
-
-                    {users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="p-5"
-                      >
-
-                        <div className="flex items-start justify-between gap-3">
-
-                          <div className="flex items-center gap-3">
-
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-200">
-
-                              <span className="text-sm font-semibold text-gray-700">
-
-                                {user.full_name
-                                  .split(" ")
-                                  .map(
-                                    (name) =>
-                                      name[0]
-                                  )
-                                  .slice(0, 2)
-                                  .join("")
-                                  .toUpperCase()}
-
-                              </span>
+                              </div>
 
                             </div>
 
-                            <div className="min-w-0">
-
-                              <p className="font-medium text-gray-900">
-                                {user.full_name}
-                              </p>
-
-                              <p className="truncate text-sm text-gray-500">
-                                {user.email ||
-                                  "Email nespecificat"}
-                              </p>
-
-                            </div>
-
-                          </div>
-
-                          {user.active ? (
-                            <span className="shrink-0 text-sm font-medium text-green-600">
-                              Activ
-                            </span>
-                          ) : (
-                            <span className="shrink-0 text-sm font-medium text-gray-500">
-                              Inactiv
-                            </span>
-                          )}
-
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-
-                          <div className="rounded-lg bg-gray-50 p-3">
-
-                            <p className="text-xs text-gray-500">
-                              Rol
-                            </p>
-
-                            <p className="mt-1 text-sm font-medium text-gray-900">
-                              {getRoleLabel(
-                                user.role,
-                                user.teams?.name
-                              )}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openEditUser(
+                                  user
+                                )
+                              }
+                              className="mt-4 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                              Editează utilizator
+                            </button>
 
                           </div>
+                        )
+                      )}
 
-                          <div className="rounded-lg bg-gray-50 p-3">
+                    </div>
 
-                            <p className="text-xs text-gray-500">
-                              Echipă
-                            </p>
-
-                            <p className="mt-1 text-sm font-medium text-gray-900">
-                              {user.teams?.name ||
-                                "—"}
-                            </p>
-
-                          </div>
-
-                        </div>
-
-                        <button
-                          type="button"
-                          className="mt-4 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          Editează utilizator
-                        </button>
-
-                      </div>
-                    ))}
-
-                  </div>
-
-                </>
-              )}
+                  </>
+                )}
 
             </div>
 
-            {/* ========================================
+            {/* ==================================================
                 PROFIL + APLICAȚIE
-            ======================================== */}
+            ================================================== */}
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-
-              {/* PROFIL */}
 
               <div className="rounded-xl bg-white p-6 shadow-sm">
 
@@ -963,7 +1903,7 @@ export default function Setari() {
                       type="text"
                       value="Victor Barbos"
                       readOnly
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none"
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
                     />
 
                   </div>
@@ -976,9 +1916,18 @@ export default function Setari() {
 
                     <input
                       type="text"
-                      value="Super Administrator"
+                      value={
+                        currentUserRole ===
+                        "super_admin"
+                          ? "Super Administrator"
+                          : currentUserRole ===
+                            "administrator"
+                          ? "Administrator"
+                          : currentUserRole ||
+                            "—"
+                      }
                       readOnly
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none"
+                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
                     />
 
                   </div>
@@ -986,8 +1935,6 @@ export default function Setari() {
                 </div>
 
               </div>
-
-              {/* APLICAȚIE */}
 
               <div className="rounded-xl bg-white p-6 shadow-sm">
 
@@ -1031,9 +1978,9 @@ export default function Setari() {
 
             </div>
 
-            {/* ========================================
+            {/* ==================================================
                 INFORMAȚIE
-            ======================================== */}
+            ================================================== */}
 
             <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-5">
 
