@@ -11,7 +11,7 @@ export default function Sidebar() {
       {/* Buton meniu telefon */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed top-4 left-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-xl text-white shadow-lg md:hidden"
+        className="fixed left-4 top-4 z-50 rounded-lg bg-melitax-primary px-3 py-2 text-xl text-white shadow-lg md:hidden"
         aria-label="Deschide meniul"
       >
         ☰
@@ -29,28 +29,32 @@ export default function Sidebar() {
       <aside
         className={`
           fixed left-0 top-0 z-50 flex h-screen w-64 flex-col
-          bg-slate-950 p-6 text-white transition-transform duration-300
+          bg-melitax-primary p-6 text-white transition-transform duration-300
           md:translate-x-0
           ${open ? "translate-x-0" : "-translate-x-full"}
         `}
       >
+        {/* Titlu */}
         <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Melitax Montări</h2>
+          <h2 className="text-2xl font-bold">
+            Melitax Montări
+          </h2>
 
           <button
             onClick={() => setOpen(false)}
-            className="rounded-lg px-2 py-1 text-2xl hover:bg-slate-800 md:hidden"
+            className="rounded-lg px-2 py-1 text-2xl hover:bg-melitax-primary-hover md:hidden"
             aria-label="Închide meniul"
           >
             ×
           </button>
         </div>
 
+        {/* Meniu */}
         <nav className="space-y-2">
           <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
             🏠 Dashboard
           </Link>
@@ -58,23 +62,31 @@ export default function Sidebar() {
           <Link
             href="/calendar"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
             📅 Calendar
           </Link>
 
           <Link
+            href="/solicitari"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
+          >
+            📋 Solicitări
+          </Link>
+
+          <Link
             href="/interventii"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
-            📋 Intervenții
+            🔧 Intervenții
           </Link>
 
           <Link
             href="/montatori"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
             👷 Montatori
           </Link>
@@ -82,7 +94,7 @@ export default function Sidebar() {
           <Link
             href="/clienti"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
             👥 Clienți
           </Link>
@@ -90,7 +102,7 @@ export default function Sidebar() {
           <Link
             href="/setari"
             onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 hover:bg-slate-800"
+            className="block rounded-lg p-3 transition hover:bg-melitax-primary-hover"
           >
             ⚙️ Setări
           </Link>

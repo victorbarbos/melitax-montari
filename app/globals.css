@@ -1,22 +1,45 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f3f4f6;
   --foreground: #171717;
+
+  /* Melitax */
+  --melitax-primary: #0f172a;
+  --melitax-primary-hover: #1e293b;
+  --melitax-blue: #2563eb;
+
+  /* Statusuri */
+  --melitax-success: #16a34a;
+  --melitax-warning: #f97316;
+  --melitax-danger: #dc2626;
+  --melitax-info: #2563eb;
+
+  /* Suprafețe */
+  --melitax-white: #ffffff;
+  --melitax-gray: #f3f4f6;
+  --melitax-border: #e5e7eb;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-melitax-primary: var(--melitax-primary);
+  --color-melitax-primary-hover: var(--melitax-primary-hover);
+  --color-melitax-blue: var(--melitax-blue);
+
+  --color-melitax-success: var(--melitax-success);
+  --color-melitax-warning: var(--melitax-warning);
+  --color-melitax-danger: var(--melitax-danger);
+  --color-melitax-info: var(--melitax-info);
+
+  --color-melitax-white: var(--melitax-white);
+  --color-melitax-gray: var(--melitax-gray);
+  --color-melitax-border: var(--melitax-border);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -24,6 +47,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
 html,
 body {
   margin: 0;
