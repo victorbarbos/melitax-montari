@@ -4,19 +4,34 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createAuditLog } from "@/lib/supabase/audit";
 
+// ======================================================
+// VARIABILE SUPABASE
+// ======================================================
+
 const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  "";
 
 const supabaseServiceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+// ======================================================
+// VERIFICARE CONFIGURAȚIE
+// ======================================================
 
 if (!supabaseUrl) {
   throw new Error(
     "NEXT_PUBLIC_SUPABASE_URL is required."
+  );
+}
+
+if (!supabaseAnonKey) {
+  throw new Error(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required."
   );
 }
 
@@ -25,6 +40,10 @@ if (!supabaseServiceRoleKey) {
     "SUPABASE_SERVICE_ROLE_KEY is required."
   );
 }
+
+// ======================================================
+// CLIENT SUPABASE ADMIN
+// ======================================================
 
 const supabaseAdmin = createClient(
   supabaseUrl,
@@ -42,51 +61,57 @@ const supabaseAdmin = createClient(
 // ======================================================
 
 async function getCurrentUser() {
-  if (!supabaseAnonKey) {
-    return {
-      user: null,
-      error: "Supabase public key is missing.",
-    };
-  }
+  const cookieStore =
+    await cookies();
 
-  const cookieStore = await cookies();
+  const supabase =
+    createServerClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(
-              ({ name, value, options }) => {
-                cookieStore.set(
+          setAll(
+            cookiesToSet
+          ) {
+            try {
+              cookiesToSet.forEach(
+                ({
                   name,
                   value,
-                  options
-                );
-              }
-            );
-          } catch {
-            // Cookie update unavailable.
-          }
+                  options,
+                }) => {
+                  cookieStore.set(
+                    name,
+                    value,
+                    options
+                  );
+                }
+              );
+            } catch {
+              // Cookie update unavailable.
+            }
+          },
         },
-      },
-    }
-  );
+      }
+    );
 
   const {
-    data: { user },
+    data: {
+      user,
+    },
     error,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   return {
     user,
-    error: error?.message || null,
+    error:
+      error?.message ??
+      null,
   };
 }
 
@@ -100,13 +125,17 @@ async function getCurrentProfile(
   const {
     data,
     error,
-  } = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, role, active"
-    )
-    .eq("id", userId)
-    .single();
+  } =
+    await supabaseAdmin
+      .from("profiles")
+      .select(
+        "id, role, active"
+      )
+      .eq(
+        "id",
+        userId
+      )
+      .single();
 
   return {
     profile: data,
@@ -143,9 +172,10 @@ export async function GET() {
     const {
       profile: currentProfile,
       error: profileError,
-    } = await getCurrentProfile(
-      currentUser.id
-    );
+    } =
+      await getCurrentProfile(
+        currentUser.id
+      );
 
     if (
       profileError ||
@@ -163,7 +193,8 @@ export async function GET() {
     }
 
     if (
-      currentProfile.active !== true ||
+      currentProfile.active !==
+        true ||
       ![
         "super_admin",
         "administrator",
@@ -185,26 +216,27 @@ export async function GET() {
     const {
       data: profiles,
       error: profilesError,
-    } = await supabaseAdmin
-      .from("profiles")
-      .select(`
-        id,
-        full_name,
-        phone,
-        role,
-        team_id,
-        active,
-        created_at,
-        teams (
-          name
-        )
-      `)
-      .order(
-        "created_at",
-        {
-          ascending: true,
-        }
-      );
+    } =
+      await supabaseAdmin
+        .from("profiles")
+        .select(`
+          id,
+          full_name,
+          phone,
+          role,
+          team_id,
+          active,
+          created_at,
+          teams (
+            name
+          )
+        `)
+        .order(
+          "created_at",
+          {
+            ascending: true,
+          }
+        );
 
     if (profilesError) {
       console.error(
@@ -263,20 +295,23 @@ export async function GET() {
     ) {
       emailMap.set(
         authUser.id,
-        authUser.email || null
+        authUser.email ??
+          null
       );
     }
 
     const users = (
-      profiles || []
-    ).map((profile) => ({
-      ...profile,
+      profiles ?? []
+    ).map(
+      (profile) => ({
+        ...profile,
 
-      email:
-        emailMap.get(
-          profile.id
-        ) || null,
-    }));
+        email:
+          emailMap.get(
+            profile.id
+          ) ?? null,
+      })
+    );
 
     return NextResponse.json(
       {
@@ -356,7 +391,8 @@ export async function POST(
     }
 
     if (
-      currentProfile.active !== true ||
+      currentProfile.active !==
+        true ||
       ![
         "super_admin",
         "administrator",
@@ -380,34 +416,36 @@ export async function POST(
 
     const fullName =
       String(
-        body.fullName || ""
+        body.fullName ?? ""
       ).trim();
 
     const phone =
       String(
-        body.phone || ""
+        body.phone ?? ""
       ).trim();
 
     const email =
       String(
-        body.email || ""
+        body.email ?? ""
       )
         .trim()
         .toLowerCase();
 
     const password =
       String(
-        body.password || ""
+        body.password ?? ""
       );
 
     const role =
       String(
-        body.role || ""
+        body.role ?? ""
       );
 
     const teamId =
       body.teamId
-        ? String(body.teamId)
+        ? String(
+            body.teamId
+          )
         : null;
 
     if (!fullName) {
@@ -540,7 +578,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            createUserError?.message ||
+            createUserError?.message ??
             "Utilizatorul nu a putut fi creat.",
         },
         {
@@ -583,7 +621,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            insertProfileError?.message ||
+            insertProfileError?.message ??
             "Profilul utilizatorului nu a putut fi creat.",
         },
         {
@@ -642,17 +680,24 @@ export async function POST(
         success: true,
 
         user: {
-          id: newUser.id,
+          id:
+            newUser.id,
+
           email:
             newUser.email,
+
           full_name:
             profile.full_name,
+
           phone:
             profile.phone,
+
           role:
             profile.role,
+
           team_id:
             profile.team_id,
+
           active:
             profile.active,
         },
@@ -687,9 +732,9 @@ export async function PUT(
   request: Request
 ) {
   try {
-    // -----------------------------------------------
-    // 1. Utilizator autentificat
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 1. UTILIZATOR AUTENTIFICAT
+    // --------------------------------------------------
 
     const {
       user: currentUser,
@@ -711,9 +756,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 2. Profilul celui care face modificarea
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 2. PROFIL CURENT
+    // --------------------------------------------------
 
     const {
       profile: currentProfile,
@@ -738,12 +783,13 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 3. Verificăm permisiunea
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 3. PERMISIUNI
+    // --------------------------------------------------
 
     if (
-      currentProfile.active !== true ||
+      currentProfile.active !==
+        true ||
       ![
         "super_admin",
         "administrator",
@@ -762,18 +808,18 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 4. Citim datele
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 4. DATE PRIMITE
+    // --------------------------------------------------
 
     const body =
       await request.json();
 
     const targetUserId =
       String(
-        body.id ||
-        body.userId ||
-        ""
+        body.id ??
+          body.userId ??
+          ""
       ).trim();
 
     if (!targetUserId) {
@@ -788,9 +834,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 5. Citim utilizatorul țintă
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 5. UTILIZATORUL ȚINTĂ
+    // --------------------------------------------------
 
     const {
       data: targetProfile,
@@ -827,9 +873,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 6. Verificăm Super Administratorul
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 6. PROTECȚIE SUPER ADMINISTRATOR
+    // --------------------------------------------------
 
     if (
       targetProfile.role ===
@@ -853,7 +899,8 @@ export async function PUT(
       if (
         targetUserId ===
           currentUser.id &&
-        body.role !== undefined &&
+        body.role !==
+          undefined &&
         body.role !==
           "super_admin"
       ) {
@@ -871,7 +918,8 @@ export async function PUT(
       if (
         targetUserId ===
           currentUser.id &&
-        body.active === false
+        body.active ===
+          false
       ) {
         return NextResponse.json(
           {
@@ -885,9 +933,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
-    // 7. Datele vechi
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 7. DATE VECHI
+    // --------------------------------------------------
 
     const oldData = {
       full_name:
@@ -921,9 +969,9 @@ export async function PUT(
     let newActive =
       targetProfile.active;
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 8. NUME
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       body.fullName !==
@@ -931,7 +979,7 @@ export async function PUT(
     ) {
       newFullName =
         String(
-          body.fullName || ""
+          body.fullName ?? ""
         ).trim();
 
       if (!newFullName) {
@@ -947,9 +995,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 9. TELEFON
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       body.phone !==
@@ -963,9 +1011,9 @@ export async function PUT(
           : null;
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 10. ROL
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       body.role !==
@@ -978,22 +1026,19 @@ export async function PUT(
 
       if (
         newRole ===
-        "super_admin"
-      ) {
-        if (
-          targetProfile.role !==
+          "super_admin" &&
+        targetProfile.role !==
           "super_admin"
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "Super Administrator nu poate fi atribuit altui utilizator.",
-            },
-            {
-              status: 403,
-            }
-          );
-        }
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Super Administrator nu poate fi atribuit altui utilizator.",
+          },
+          {
+            status: 403,
+          }
+        );
       }
 
       const allowedRoles = [
@@ -1038,9 +1083,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 11. ECHIPĂ
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       body.teamId !==
@@ -1086,13 +1131,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 12. ACTIV / INACTIV
-    //
-    // IMPORTANT:
-    // Doar dacă valoarea chiar se schimbă,
-    // verificăm dreptul Super Administratorului.
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       body.active !==
@@ -1127,10 +1168,9 @@ export async function PUT(
         requestedActive;
     }
 
-    // -----------------------------------------------
-    // 13. ADMINISTRATORUL NU POATE MODIFICA
-    // SUPER ADMINISTRATORUL
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 13. ADMINISTRATOR → NU POATE MODIFICA SUPER ADMIN
+    // --------------------------------------------------
 
     if (
       currentProfile.role ===
@@ -1149,9 +1189,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 14. VERIFICĂM DACĂ EXISTĂ MODIFICĂRI
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 14. EXISTĂ MODIFICĂRI?
+    // --------------------------------------------------
 
     const hasChanges =
       newFullName !==
@@ -1178,9 +1218,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 15. ACTUALIZĂM PROFILUL
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 15. ACTUALIZARE PROFIL
+    // --------------------------------------------------
 
     const {
       data: updatedProfile,
@@ -1226,7 +1266,7 @@ export async function PUT(
       return NextResponse.json(
         {
           error:
-            updateError?.message ||
+            updateError?.message ??
             "Utilizatorul nu a putut fi modificat.",
         },
         {
@@ -1235,9 +1275,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
-    // 16. DATE NOI PENTRU AUDIT
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 16. DATE NOI
+    // --------------------------------------------------
 
     const newData = {
       full_name:
@@ -1256,9 +1296,9 @@ export async function PUT(
         updatedProfile.active,
     };
 
-    // -----------------------------------------------
-    // 17. AUDIT — UPDATE GENERAL
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 17. AUDIT — UPDATE
+    // --------------------------------------------------
 
     try {
       await createAuditLog({
@@ -1288,9 +1328,9 @@ export async function PUT(
       );
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 18. AUDIT — SCHIMBARE ROL
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       oldData.role !==
@@ -1331,9 +1371,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 19. AUDIT — SCHIMBARE ECHIPĂ
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     if (
       oldData.team_id !==
@@ -1374,9 +1414,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
-    // 20. AUDIT — ACTIV / INACTIV
-    // -----------------------------------------------
+    // --------------------------------------------------
+    // 20. AUDIT — STATUS
+    // --------------------------------------------------
 
     if (
       oldData.active !==
@@ -1417,9 +1457,9 @@ export async function PUT(
       }
     }
 
-    // -----------------------------------------------
+    // --------------------------------------------------
     // 21. RĂSPUNS
-    // -----------------------------------------------
+    // --------------------------------------------------
 
     return NextResponse.json(
       {

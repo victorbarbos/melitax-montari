@@ -3,19 +3,34 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+// ======================================================
+// VARIABILE SUPABASE
+// ======================================================
+
 const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  "";
 
 const supabaseServiceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+// ======================================================
+// VERIFICARE CONFIGURAȚIE
+// ======================================================
 
 if (!supabaseUrl) {
   throw new Error(
     "NEXT_PUBLIC_SUPABASE_URL is required."
+  );
+}
+
+if (!supabaseAnonKey) {
+  throw new Error(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required."
   );
 }
 
@@ -24,6 +39,10 @@ if (!supabaseServiceRoleKey) {
     "SUPABASE_SERVICE_ROLE_KEY is required."
   );
 }
+
+// ======================================================
+// CLIENT SUPABASE ADMIN
+// ======================================================
 
 const supabaseAdmin = createClient(
   supabaseUrl,
@@ -41,70 +60,69 @@ const supabaseAdmin = createClient(
 // ======================================================
 
 async function getCurrentUser() {
-  if (!supabaseAnonKey) {
-    return {
-      user: null,
-      error: "Supabase public key is missing.",
-    };
-  }
+  const cookieStore =
+    await cookies();
 
-  const cookieStore = await cookies();
+  const supabase =
+    createServerClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(
-              ({
-                name,
-                value,
-                options,
-              }) => {
-                cookieStore.set(
+          setAll(
+            cookiesToSet
+          ) {
+            try {
+              cookiesToSet.forEach(
+                ({
                   name,
                   value,
-                  options
-                );
-              }
-            );
-          } catch {
-            // Cookie update unavailable.
-          }
+                  options,
+                }) => {
+                  cookieStore.set(
+                    name,
+                    value,
+                    options
+                  );
+                }
+              );
+            } catch {
+              // Cookie update unavailable.
+            }
+          },
         },
-      },
-    }
-  );
+      }
+    );
 
   const {
-    data: { user },
+    data: {
+      user,
+    },
     error,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   return {
     user,
     error:
-      error?.message ||
+      error?.message ??
       null,
   };
 }
 
 // ======================================================
 // GET — AUDIT LOG
-// DOAR SUPER ADMINISTRATOR
 // ======================================================
 
 export async function GET() {
   try {
-    // -----------------------------------------------
+    // ==================================================
     // 1. AUTENTIFICARE
-    // -----------------------------------------------
+    // ==================================================
 
     const {
       user: currentUser,
@@ -126,9 +144,9 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 2. PROFIL CURENT
-    // -----------------------------------------------
+    // ==================================================
+    // 2. PROFIL UTILIZATOR
+    // ==================================================
 
     const {
       data: currentProfile,
@@ -160,15 +178,15 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
+    // ==================================================
     // 3. DOAR SUPER ADMINISTRATOR
-    // -----------------------------------------------
+    // ==================================================
 
     if (
-      currentProfile.active !==
-        true ||
       currentProfile.role !==
-        "super_admin"
+        "super_admin" ||
+      currentProfile.active !==
+        true
     ) {
       return NextResponse.json(
         {
@@ -181,9 +199,9 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 4. AUDIT LOG
-    // -----------------------------------------------
+    // ==================================================
+    // 4. CITIRE AUDIT LOG
+    // ==================================================
 
     const {
       data: logs,
@@ -227,22 +245,27 @@ export async function GET() {
       );
     }
 
-    // -----------------------------------------------
-    // 5. UTILIZATORII CARE AU FĂCUT ACȚIUNILE
-    // -----------------------------------------------
+    // ==================================================
+    // 5. ACTORII
+    // ==================================================
 
     const userIds = [
       ...new Set(
-        (logs || [])
+        (logs ?? [])
           .map(
             (log) =>
               log.user_id
           )
-          .filter(Boolean)
+          .filter(
+            (
+              id
+            ): id is string =>
+              Boolean(id)
+          )
       ),
     ];
 
-    let actorMap =
+    const actorMap =
       new Map<
         string,
         {
@@ -275,27 +298,22 @@ export async function GET() {
           actorsError
         );
       } else {
-        actorMap =
-          new Map(
-            (actors || []).map(
-              (actor) => [
-                actor.id,
-                actor,
-              ]
-            )
-          );
+        (
+          actors ?? []
+        ).forEach(
+          (actor) => {
+            actorMap.set(
+              actor.id,
+              actor
+            );
+          }
+        );
       }
     }
 
-    // -----------------------------------------------
+    // ==================================================
     // 6. ECHIPE
-    //
-    // Folosim aceste date pentru a transforma:
-    //
-    // team_id
-    //      ↓
-    // Echipa Deservire / Echipa Montare
-    // -----------------------------------------------
+    // ==================================================
 
     const {
       data: teams,
@@ -321,7 +339,7 @@ export async function GET() {
       >();
 
     (
-      teams || []
+      teams ?? []
     ).forEach(
       (team) => {
         teamMap.set(
@@ -331,15 +349,17 @@ export async function GET() {
       }
     );
 
-    // -----------------------------------------------
-    // 7. TRANSFORMĂ DATELE PENTRU AFIȘARE
-    // -----------------------------------------------
+    // ==================================================
+    // 7. DATE UȘOR DE CITIT
+    // ==================================================
 
     const makeReadableData = (
-      data: Record<
-        string,
-        unknown
-      > | null
+      data:
+        | Record<
+            string,
+            unknown
+          >
+        | null
     ) => {
       if (!data) {
         return null;
@@ -349,28 +369,28 @@ export async function GET() {
         ...data,
       };
 
-      // -----------------------------
+      // ------------------------------------------------
       // ECHIPĂ
-      // -----------------------------
+      // ------------------------------------------------
 
       if (
         typeof readable.team_id ===
-          "string"
+        "string"
       ) {
         readable.team_name =
           teamMap.get(
             readable.team_id
-          ) ||
+          ) ??
           readable.team_id;
       }
 
-      // -----------------------------
+      // ------------------------------------------------
       // ROL
-      // -----------------------------
+      // ------------------------------------------------
 
       if (
         typeof readable.role ===
-          "string"
+        "string"
       ) {
         const roleLabels: Record<
           string,
@@ -395,17 +415,17 @@ export async function GET() {
         readable.role_name =
           roleLabels[
             readable.role
-          ] ||
+          ] ??
           readable.role;
       }
 
-      // -----------------------------
+      // ------------------------------------------------
       // STATUS
-      // -----------------------------
+      // ------------------------------------------------
 
       if (
         typeof readable.active ===
-          "boolean"
+        "boolean"
       ) {
         readable.active_name =
           readable.active
@@ -416,76 +436,71 @@ export async function GET() {
       return readable;
     };
 
-    // -----------------------------------------------
-    // 8. CONSTRUIM REZULTATUL
-    // -----------------------------------------------
+    // ==================================================
+    // 8. CONSTRUIM RĂSPUNSUL
+    // ==================================================
 
-    const result = (
-      logs || []
-    ).map(
-      (log) => {
-        const actor =
-          log.user_id
-            ? actorMap.get(
-                log.user_id
-              )
-            : null;
+    const result =
+      (logs ?? []).map(
+        (log) => {
+          const actor =
+            log.user_id
+              ? actorMap.get(
+                  log.user_id
+                )
+              : undefined;
 
-        return {
-          id: log.id,
+          return {
+            id: log.id,
 
-          created_at:
-            log.created_at,
+            created_at:
+              log.created_at,
 
-          user_id:
-            log.user_id,
+            user_id:
+              log.user_id,
 
-          actor_name:
-            actor?.full_name ||
-            "Utilizator necunoscut",
+            actor_name:
+              actor?.full_name ??
+              "Utilizator necunoscut",
 
-          actor_role:
-            actor?.role ||
-            null,
+            actor_role:
+              actor?.role ??
+              null,
 
-          action:
-            log.action,
+            action:
+              log.action,
 
-          entity_type:
-            log.entity_type,
+            entity_type:
+              log.entity_type,
 
-          entity_id:
-            log.entity_id,
+            entity_id:
+              log.entity_id,
 
-          entity_name:
-            log.entity_name,
+            entity_name:
+              log.entity_name,
 
-          old_data:
-            log.old_data,
+            old_data:
+              log.old_data,
 
-          new_data:
-            log.new_data,
+            new_data:
+              log.new_data,
 
-          // ---------------------------------------
-          // DATE PENTRU AFIȘARE
-          // ---------------------------------------
+            old_data_readable:
+              makeReadableData(
+                log.old_data
+              ),
 
-          old_data_readable:
-            makeReadableData(
-              log.old_data
-            ),
+            new_data_readable:
+              makeReadableData(
+                log.new_data
+              ),
+          };
+        }
+      );
 
-          new_data_readable:
-            makeReadableData(
-              log.new_data
-            ),
-        };
-      }
-    );
-
-    // -----------------------------------------------
+    // ==================================================
     // 9. RĂSPUNS
-    // -----------------------------------------------
+    // ==================================================
 
     return NextResponse.json(
       {
