@@ -15,6 +15,7 @@ type UserProfile = {
   team_id: string | null;
   active: boolean;
   created_at: string;
+  avatar_url?: string | null;
 
   teams: {
     name: string;
@@ -67,6 +68,18 @@ const getRoleLabel = (
   return role;
 };
 
+const getInitials = (name: string) => {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U"
+  );
+};
+
 export default function Setari() {
   // ==================================================
   // UTILIZATORI
@@ -94,8 +107,54 @@ export default function Setari() {
   const [currentUserRole, setCurrentUserRole] =
     useState<string | null>(null);
 
+  const [currentUserProfile, setCurrentUserProfile] =
+    useState<UserProfile | null>(null);
+
   const [loadingCurrentUser, setLoadingCurrentUser] =
     useState(true);
+
+  // ==================================================
+  // PROFIL PERSONAL
+  // ==================================================
+
+  const [profilePhone, setProfilePhone] =
+    useState("");
+
+  const [profileAvatarPath, setProfileAvatarPath] =
+    useState<string | null>(null);
+
+  const [profileAvatarUrl, setProfileAvatarUrl] =
+    useState<string | null>(null);
+
+  const [selectedAvatarFile, setSelectedAvatarFile] =
+    useState<File | null>(null);
+
+  const [avatarPreviewUrl, setAvatarPreviewUrl] =
+    useState<string | null>(null);
+
+  const [savingProfile, setSavingProfile] =
+    useState(false);
+
+  const [profileError, setProfileError] =
+    useState("");
+
+  const [profileSuccess, setProfileSuccess] =
+    useState("");
+
+  const [newPassword, setNewPassword] =
+    useState("");
+
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
+
+  const [savingPassword, setSavingPassword] =
+    useState(false);
+
+  const [passwordError, setPasswordError] =
+    useState("");
+
+  const [passwordSuccess, setPasswordSuccess] =
+    useState("");
 
   // ==================================================
   // CREARE UTILIZATOR
@@ -122,7 +181,7 @@ export default function Setari() {
   const [newEmail, setNewEmail] =
     useState("");
 
-  const [newPassword, setNewPassword] =
+  const [newPasswordCreate, setNewPasswordCreate] =
     useState("");
 
   const [newRole, setNewRole] =
@@ -155,6 +214,10 @@ export default function Setari() {
 
   const [editingActive, setEditingActive] =
     useState(true);
+
+  // Parolă temporară pentru alt utilizator - vizibilă doar Super Administratorului
+  const [editingTemporaryPassword, setEditingTemporaryPassword] =
+    useState("");
 
   const [savingUser, setSavingUser] =
     useState(false);
@@ -251,6 +314,44 @@ export default function Setari() {
   };
 
   // ==================================================
+  // URL POZĂ PROFIL
+  // ==================================================
+
+  const loadAvatarUrl = async (
+    avatarPath: string | null
+  ) => {
+    if (!avatarPath) {
+      setProfileAvatarUrl(null);
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } =
+      await supabase.storage
+        .from("avatars")
+        .createSignedUrl(
+          avatarPath,
+          60 * 60
+        );
+
+    if (error) {
+      console.error(
+        "LOAD AVATAR URL ERROR:",
+        error
+      );
+
+      setProfileAvatarUrl(null);
+      return;
+    }
+
+    setProfileAvatarUrl(
+      data?.signedUrl || null
+    );
+  };
+
+  // ==================================================
   // UTILIZATOR CURENT
   // ==================================================
 
@@ -276,8 +377,11 @@ export default function Setari() {
         return;
       }
 
+      const userId =
+        data.user.id;
+
       setCurrentUserId(
-        data.user.id
+        userId
       );
 
       const {
@@ -287,11 +391,19 @@ export default function Setari() {
         await supabase
           .from("profiles")
           .select(
-            "role, active"
+            `
+              id,
+              full_name,
+              phone,
+              role,
+              team_id,
+              active,
+              avatar_url
+            `
           )
           .eq(
             "id",
-            data.user.id
+            userId
           )
           .single();
 
@@ -307,8 +419,47 @@ export default function Setari() {
         return;
       }
 
+      const profileTeam =
+        teams.find(
+          (team) =>
+            team.id ===
+            profile.team_id
+        );
+
+      const profileWithTeam: UserProfile =
+        {
+          ...profile,
+          email:
+            data.user.email ||
+            null,
+          created_at: "",
+          teams:
+            profileTeam
+              ? {
+                  name:
+                    profileTeam.name,
+                }
+              : null,
+        };
+
+      setCurrentUserProfile(
+        profileWithTeam
+      );
+
       setCurrentUserRole(
         profile.role
+      );
+
+      setProfilePhone(
+        profile.phone || ""
+      );
+
+      setProfileAvatarPath(
+        profile.avatar_url || null
+      );
+
+      await loadAvatarUrl(
+        profile.avatar_url || null
       );
     } catch (error) {
       console.error(
@@ -327,8 +478,19 @@ export default function Setari() {
   useEffect(() => {
     loadUsers();
     loadTeams();
-    loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (!loadingCurrentUser) {
+      return;
+    }
+
+    if (teams.length === 0) {
+      return;
+    }
+
+    loadCurrentUser();
+  }, [teams]);
 
   // ==================================================
   // RESET FORMULAR CREARE
@@ -338,7 +500,7 @@ export default function Setari() {
     setNewName("");
     setNewPhone("");
     setNewEmail("");
-    setNewPassword("");
+    setNewPasswordCreate("");
     setNewRole(
       "personal_teren"
     );
@@ -391,7 +553,7 @@ export default function Setari() {
       }
 
       if (
-        newPassword.length < 8
+        newPasswordCreate.length < 8
       ) {
         setFormError(
           "Parola trebuie să conțină cel puțin 8 caractere."
@@ -438,7 +600,7 @@ export default function Setari() {
                     .toLowerCase(),
 
                 password:
-                  newPassword,
+                  newPasswordCreate,
 
                 role:
                   newRole,
@@ -520,6 +682,8 @@ export default function Setari() {
       Boolean(user.active)
     );
 
+    setEditingTemporaryPassword("");
+
     setEditError("");
     setEditSuccess("");
 
@@ -550,6 +714,7 @@ export default function Setari() {
     setEditingRole("");
     setEditingTeam("");
     setEditingActive(true);
+    setEditingTemporaryPassword("");
 
     setEditError("");
     setEditSuccess("");
@@ -567,10 +732,6 @@ export default function Setari() {
 
       setEditError("");
       setEditSuccess("");
-
-      // ----------------------------------------------
-      // VALORI ORIGINALE
-      // ----------------------------------------------
 
       const originalName =
         editingUser.full_name;
@@ -591,10 +752,6 @@ export default function Setari() {
           editingUser.active
         );
 
-      // ----------------------------------------------
-      // VALORI NOI
-      // ----------------------------------------------
-
       const newNameValue =
         editingName.trim();
 
@@ -612,9 +769,11 @@ export default function Setari() {
           editingActive
         );
 
-      // ----------------------------------------------
-      // VERIFICĂM DACĂ EXISTĂ MODIFICĂRI
-      // ----------------------------------------------
+      const temporaryPassword =
+        editingTemporaryPassword.trim();
+
+      const hasTemporaryPassword =
+        temporaryPassword.length > 0;
 
       const hasChanges =
         newNameValue !==
@@ -626,13 +785,8 @@ export default function Setari() {
         newTeamValue !==
           originalTeam ||
         newActiveValue !==
-          originalActive;
-
-      // ----------------------------------------------
-      // IMPORTANT:
-      // dacă NU există modificări,
-      // NU verificăm permisiunile de modificare.
-      // ----------------------------------------------
+          originalActive ||
+        hasTemporaryPassword;
 
       if (!hasChanges) {
         setEditSuccess(
@@ -642,10 +796,6 @@ export default function Setari() {
         return;
       }
 
-      // ----------------------------------------------
-      // VALIDARE NUME
-      // ----------------------------------------------
-
       if (!newNameValue) {
         setEditError(
           "Numele complet este obligatoriu."
@@ -654,10 +804,31 @@ export default function Setari() {
         return;
       }
 
-      // ----------------------------------------------
-      // ADMINISTRATOR → NU POATE MODIFICA
-      // SUPER ADMINISTRATOR
-      // ----------------------------------------------
+      if (hasTemporaryPassword) {
+        if (currentUserRole !== "super_admin") {
+          setEditError(
+            "Doar Super Administratorul poate seta o parolă temporară."
+          );
+
+          return;
+        }
+
+        if (editingUser.id === currentUserId) {
+          setEditError(
+            "Parola temporară poate fi setată doar pentru alt utilizator."
+          );
+
+          return;
+        }
+
+        if (temporaryPassword.length < 8) {
+          setEditError(
+            "Parola temporară trebuie să conțină cel puțin 8 caractere."
+          );
+
+          return;
+        }
+      }
 
       if (
         currentUserRole ===
@@ -672,10 +843,6 @@ export default function Setari() {
         return;
       }
 
-      // ----------------------------------------------
-      // ADMINISTRATOR → NU POATE SCHIMBA ROLUL
-      // ----------------------------------------------
-
       if (
         currentUserRole ===
           "administrator" &&
@@ -688,10 +855,6 @@ export default function Setari() {
 
         return;
       }
-
-      // ----------------------------------------------
-      // DOAR SUPER ADMIN → STATUS
-      // ----------------------------------------------
 
       if (
         currentUserRole !==
@@ -706,11 +869,6 @@ export default function Setari() {
         return;
       }
 
-      // ----------------------------------------------
-      // NIMENI NU POATE CREA SUPER ADMIN
-      // PRIN MODIFICAREA UNUI USER
-      // ----------------------------------------------
-
       if (
         newRoleValue ===
           "super_admin" &&
@@ -723,10 +881,6 @@ export default function Setari() {
 
         return;
       }
-
-      // ----------------------------------------------
-      // SUPER ADMIN NU ÎȘI POATE SCHIMBA ROLUL
-      // ----------------------------------------------
 
       if (
         editingUser.id ===
@@ -743,10 +897,6 @@ export default function Setari() {
         return;
       }
 
-      // ----------------------------------------------
-      // SUPER ADMIN NU SE POATE DEZACTIVA
-      // ----------------------------------------------
-
       if (
         editingUser.id ===
           currentUserId &&
@@ -761,10 +911,6 @@ export default function Setari() {
 
         return;
       }
-
-      // ----------------------------------------------
-      // SALVARE
-      // ----------------------------------------------
 
       setSavingUser(
         true
@@ -801,6 +947,11 @@ export default function Setari() {
 
                 active:
                   newActiveValue,
+
+                temporaryPassword:
+                  hasTemporaryPassword
+                    ? temporaryPassword
+                    : "",
               }),
             }
           );
@@ -843,8 +994,352 @@ export default function Setari() {
     };
 
   // ==================================================
+  // SELECTARE POZĂ
+  // ==================================================
+
+  const handleAvatarChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setProfileError("");
+    setProfileSuccess("");
+
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setProfileError(
+        "Te rog selectează o imagine."
+      );
+
+      return;
+    }
+
+    if (
+      file.size >
+      5 * 1024 * 1024
+    ) {
+      setProfileError(
+        "Imaginea nu poate depăși 5 MB."
+      );
+
+      return;
+    }
+
+    if (
+      avatarPreviewUrl
+    ) {
+      URL.revokeObjectURL(
+        avatarPreviewUrl
+      );
+    }
+
+    const preview =
+      URL.createObjectURL(
+        file
+      );
+
+    setSelectedAvatarFile(
+      file
+    );
+
+    setAvatarPreviewUrl(
+      preview
+    );
+  };
+
+  // ==================================================
+  // SALVARE PROFIL
+  // ==================================================
+
+  const handleSaveProfile =
+    async () => {
+      if (!currentUserId) {
+        setProfileError(
+          "Utilizatorul nu este autentificat."
+        );
+
+        return;
+      }
+
+      setProfileError("");
+      setProfileSuccess("");
+
+      setSavingProfile(
+        true
+      );
+
+      try {
+        let avatarPath =
+          profileAvatarPath;
+
+        // ----------------------------------------------
+        // UPLOAD POZĂ
+        // ----------------------------------------------
+
+        if (
+          selectedAvatarFile
+        ) {
+          avatarPath =
+            `${currentUserId}/avatar`;
+
+          const {
+            error: uploadError,
+          } =
+            await supabase.storage
+              .from("avatars")
+              .upload(
+                avatarPath,
+                selectedAvatarFile,
+                {
+                  upsert: true,
+                  contentType:
+                    selectedAvatarFile.type,
+                  cacheControl:
+                    "3600",
+                }
+              );
+
+          if (uploadError) {
+            console.error(
+              "AVATAR UPLOAD ERROR:",
+              uploadError
+            );
+
+            throw new Error(
+              "Poza nu a putut fi încărcată."
+            );
+          }
+        }
+
+        // ----------------------------------------------
+        // UPDATE PROFIL
+        // ----------------------------------------------
+
+        const {
+          error: profileUpdateError,
+        } =
+          await supabase
+            .from("profiles")
+            .update({
+              phone:
+                profilePhone.trim() ||
+                null,
+
+              avatar_url:
+                avatarPath,
+            })
+            .eq(
+              "id",
+              currentUserId
+            );
+
+        if (profileUpdateError) {
+          console.error(
+            "PROFILE UPDATE ERROR:",
+            profileUpdateError
+          );
+
+          throw new Error(
+            profileUpdateError.message ||
+              "Profilul nu a putut fi salvat."
+          );
+        }
+
+        // UPDATE-ul a reușit.
+        // Nu folosim .select().single() aici deoarece
+        // RLS poate permite UPDATE, dar poate bloca
+        // returnarea rândului actualizat.
+        const updatedPhone =
+          profilePhone.trim() ||
+          "";
+
+        const updatedProfile = {
+          ...(currentUserProfile || {
+            id: currentUserId,
+            full_name: "Utilizator",
+            email: null,
+            phone: null,
+            role: "personal_teren",
+            team_id: null,
+            active: true,
+            created_at: "",
+            teams: null,
+          }),
+
+          phone:
+            updatedPhone,
+
+          avatar_url:
+            avatarPath,
+        };
+
+        setCurrentUserProfile(
+          updatedProfile
+        );
+
+        setProfilePhone(
+          updatedPhone
+        );
+
+        setProfileAvatarPath(
+          avatarPath ||
+            null
+        );
+
+        await loadAvatarUrl(
+          avatarPath ||
+            null
+        );
+
+        if (
+          avatarPreviewUrl
+        ) {
+          URL.revokeObjectURL(
+            avatarPreviewUrl
+          );
+        }
+
+        setSelectedAvatarFile(
+          null
+        );
+
+        setAvatarPreviewUrl(
+          null
+        );
+
+        setProfileSuccess(
+          "Profilul a fost salvat cu succes."
+        );
+      } catch (error) {
+        console.error(
+          "SAVE PROFILE ERROR:",
+          error
+        );
+
+        setProfileError(
+          error instanceof Error
+            ? error.message
+            : "Profilul nu a putut fi salvat."
+        );
+      } finally {
+        setSavingProfile(
+          false
+        );
+      }
+    };
+
+  // ==================================================
+  // SCHIMBARE PAROLĂ
+  // ==================================================
+
+  const handleChangePassword =
+    async () => {
+      setPasswordError("");
+      setPasswordSuccess("");
+
+      if (
+        newPassword.length < 8
+      ) {
+        setPasswordError(
+          "Parola trebuie să conțină cel puțin 8 caractere."
+        );
+
+        return;
+      }
+
+      if (
+        newPassword !==
+        confirmPassword
+      ) {
+        setPasswordError(
+          "Parolele nu coincid."
+        );
+
+        return;
+      }
+
+      setSavingPassword(
+        true
+      );
+
+      try {
+        const {
+          error,
+        } =
+          await supabase.auth.updateUser(
+            {
+              password:
+                newPassword,
+            }
+          );
+
+        if (error) {
+          console.error(
+            "PASSWORD UPDATE ERROR:",
+            error
+          );
+
+          setPasswordError(
+            error.message ||
+              "Parola nu a putut fi schimbată."
+          );
+
+          return;
+        }
+
+        setNewPassword("");
+        setConfirmPassword("");
+
+        setPasswordSuccess(
+          "Parola a fost schimbată cu succes."
+        );
+      } catch (error) {
+        console.error(
+          "CHANGE PASSWORD ERROR:",
+          error
+        );
+
+        setPasswordError(
+          "Parola nu a putut fi schimbată."
+        );
+      } finally {
+        setSavingPassword(
+          false
+        );
+      }
+    };
+
+  // ==================================================
   // RENDER
   // ==================================================
+
+  const profileName =
+    currentUserProfile?.full_name ||
+    "Utilizator";
+
+  const profileRole =
+    currentUserProfile
+      ? getRoleLabel(
+          currentUserProfile.role,
+          currentUserProfile.teams?.name
+        )
+      : "—";
+
+  const profileTeam =
+    currentUserProfile?.teams?.name ||
+    "Fără echipă";
+
+  const displayedAvatar =
+    avatarPreviewUrl ||
+    profileAvatarUrl;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1038,10 +1533,10 @@ export default function Setari() {
                         <input
                           type="password"
                           value={
-                            newPassword
+                            newPasswordCreate
                           }
                           onChange={(event) =>
-                            setNewPassword(
+                            setNewPasswordCreate(
                               event.target.value
                             )
                           }
@@ -1477,6 +1972,37 @@ export default function Setari() {
 
                         </div>
 
+                        {/* PAROLĂ TEMPORARĂ - DOAR SUPER ADMINISTRATOR PENTRU ALT UTILIZATOR */}
+
+                        {currentUserRole === "super_admin" &&
+                          editingUser.id !== currentUserId && (
+                            <div className="md:col-span-2">
+
+                              <label className="mb-2 block text-sm font-medium text-gray-700">
+                                Parolă temporară
+                              </label>
+
+                              <input
+                                type="password"
+                                value={editingTemporaryPassword}
+                                onChange={(event) =>
+                                  setEditingTemporaryPassword(
+                                    event.target.value
+                                  )
+                                }
+                                disabled={savingUser}
+                                placeholder="Minimum 8 caractere"
+                                autoComplete="new-password"
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                              />
+
+                              <p className="mt-1 text-xs text-gray-400">
+                                Parola va fi temporară și utilizatorul va trebui să o schimbe la prima autentificare.
+                              </p>
+
+                            </div>
+                          )}
+
                       </div>
 
                       {editError && (
@@ -1626,28 +2152,23 @@ export default function Setari() {
 
                                   <div className="flex items-center gap-3">
 
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
+                                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gray-200">
 
-                                      <span className="text-sm font-semibold text-gray-700">
-
-                                        {user.full_name
-                                          .split(
-                                            " "
-                                          )
-                                          .map(
-                                            (name) =>
-                                              name[0]
-                                          )
-                                          .slice(
-                                            0,
-                                            2
-                                          )
-                                          .join(
-                                            ""
-                                          )
-                                          .toUpperCase()}
-
-                                      </span>
+                                      {user.avatar_url ? (
+                                        <div className="flex h-full w-full items-center justify-center bg-gray-200">
+                                          <span className="text-sm font-semibold text-gray-700">
+                                            {getInitials(
+                                              user.full_name
+                                            )}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm font-semibold text-gray-700">
+                                          {getInitials(
+                                            user.full_name
+                                          )}
+                                        </span>
+                                      )}
 
                                     </div>
 
@@ -1762,27 +2283,12 @@ export default function Setari() {
 
                               <div className="flex items-center gap-3">
 
-                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-200">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200">
 
                                   <span className="text-sm font-semibold text-gray-700">
-
-                                    {user.full_name
-                                      .split(
-                                        " "
-                                      )
-                                      .map(
-                                        (name) =>
-                                          name[0]
-                                      )
-                                      .slice(
-                                        0,
-                                        2
-                                      )
-                                      .join(
-                                        ""
-                                      )
-                                      .toUpperCase()}
-
+                                    {getInitials(
+                                      user.full_name
+                                    )}
                                   </span>
 
                                 </div>
@@ -1879,96 +2385,352 @@ export default function Setari() {
                 PROFIL + APLICAȚIE
             ================================================== */}
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+
+              {/* ==================================================
+                  PROFIL PERSONAL
+              ================================================== */}
 
               <div className="rounded-xl bg-white p-6 shadow-sm">
 
                 <h2 className="font-semibold text-gray-900">
-                  Profil
+                  Profilul meu
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-500">
-                  Datele utilizatorului conectat
+                  Datele tale personale și fotografia de profil
                 </p>
 
-                <div className="mt-5 space-y-4">
-
-                  <div>
-
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Nume
-                    </label>
-
-                    <input
-                      type="text"
-                      value="Victor Barbos"
-                      readOnly
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
-                    />
-
+                {loadingCurrentUser ? (
+                  <div className="mt-6 rounded-lg bg-gray-50 p-6 text-center text-sm text-gray-500">
+                    Se încarcă profilul...
                   </div>
+                ) : (
+                  <>
 
-                  <div>
+                    {/* POZĂ */}
 
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Rol
-                    </label>
+                    <div className="mt-6 flex flex-col items-center sm:flex-row sm:items-center sm:gap-5">
 
-                    <input
-                      type="text"
-                      value={
-                        currentUserRole ===
-                        "super_admin"
-                          ? "Super Administrator"
-                          : currentUserRole ===
-                            "administrator"
-                          ? "Administrator"
-                          : currentUserRole ||
-                            "—"
-                      }
-                      readOnly
-                      className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
-                    />
+                      <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200">
+
+                        {displayedAvatar ? (
+                          <img
+                            src={
+                              displayedAvatar
+                            }
+                            alt="Poza de profil"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-2xl font-semibold text-gray-600">
+                            {getInitials(
+                              profileName
+                            )}
+                          </span>
+                        )}
+
+                      </div>
+
+                      <div className="mt-4 text-center sm:mt-0 sm:text-left">
+
+                        <label className="inline-flex cursor-pointer rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+
+                          Schimbă poza
+
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={
+                              handleAvatarChange
+                            }
+                            className="hidden"
+                          />
+
+                        </label>
+
+                        <p className="mt-2 text-xs text-gray-400">
+                          JPG, PNG, WEBP — maximum 5 MB
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    {/* NUME */}
+
+                    <div className="mt-6">
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Nume
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          profileName
+                        }
+                        readOnly
+                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
+                      />
+
+                      <p className="mt-1 text-xs text-gray-400">
+                        Numele poate fi modificat doar de administrator.
+                      </p>
+
+                    </div>
+
+                    {/* TELEFON */}
+
+                    <div className="mt-5">
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Telefon
+                      </label>
+
+                      <input
+                        type="tel"
+                        value={
+                          profilePhone
+                        }
+                        onChange={(event) =>
+                          setProfilePhone(
+                            event.target.value
+                          )
+                        }
+                        disabled={
+                          savingProfile
+                        }
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                      />
+
+                    </div>
+
+                    {/* ROL */}
+
+                    <div className="mt-5">
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Rol
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          profileRole
+                        }
+                        readOnly
+                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
+                      />
+
+                    </div>
+
+                    {/* ECHIPĂ */}
+
+                    <div className="mt-5">
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Echipă
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          profileTeam
+                        }
+                        readOnly
+                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
+                      />
+
+                    </div>
+
+                    {profileError && (
+                      <div className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                        {
+                          profileError
+                        }
+                      </div>
+                    )}
+
+                    {profileSuccess && (
+                      <div className="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        {
+                          profileSuccess
+                        }
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex justify-end">
+
+                      <button
+                        type="button"
+                        onClick={
+                          handleSaveProfile
+                        }
+                        disabled={
+                          savingProfile ||
+                          loadingCurrentUser
+                        }
+                        className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {savingProfile
+                          ? "Se salvează..."
+                          : "Salvează profilul"}
+                      </button>
+
+                    </div>
+
+                  </>
+                )}
+
+              </div>
+
+              {/* ==================================================
+                  PAROLĂ + APLICAȚIE
+              ================================================== */}
+
+              <div className="space-y-4">
+
+                {/* SCHIMBARE PAROLĂ */}
+
+                <div className="rounded-xl bg-white p-6 shadow-sm">
+
+                  <h2 className="font-semibold text-gray-900">
+                    Securitate
+                  </h2>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    Schimbarea parolei contului tău
+                  </p>
+
+                  <div className="mt-5 space-y-4">
+
+                    <div>
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Parolă nouă
+                      </label>
+
+                      <input
+                        type="password"
+                        value={
+                          newPassword
+                        }
+                        onChange={(event) =>
+                          setNewPassword(
+                            event.target.value
+                          )
+                        }
+                        disabled={
+                          savingPassword
+                        }
+                        placeholder="Minimum 8 caractere"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                      />
+
+                    </div>
+
+                    <div>
+
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Confirmă parola
+                      </label>
+
+                      <input
+                        type="password"
+                        value={
+                          confirmPassword
+                        }
+                        onChange={(event) =>
+                          setConfirmPassword(
+                            event.target.value
+                          )
+                        }
+                        disabled={
+                          savingPassword
+                        }
+                        placeholder="Repetă parola"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 disabled:bg-gray-100"
+                      />
+
+                    </div>
+
+                    {passwordError && (
+                      <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                        {
+                          passwordError
+                        }
+                      </div>
+                    )}
+
+                    {passwordSuccess && (
+                      <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                        {
+                          passwordSuccess
+                        }
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+
+                      <button
+                        type="button"
+                        onClick={
+                          handleChangePassword
+                        }
+                        disabled={
+                          savingPassword
+                        }
+                        className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {savingPassword
+                          ? "Se schimbă..."
+                          : "Schimbă parola"}
+                      </button>
+
+                    </div>
 
                   </div>
 
                 </div>
 
-              </div>
+                {/* APLICAȚIE */}
 
-              <div className="rounded-xl bg-white p-6 shadow-sm">
+                <div className="rounded-xl bg-white p-6 shadow-sm">
 
-                <h2 className="font-semibold text-gray-900">
-                  Aplicație
-                </h2>
+                  <h2 className="font-semibold text-gray-900">
+                    Aplicație
+                  </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  Informații despre aplicație
-                </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Informații despre aplicație
+                  </p>
 
-                <div className="mt-5 space-y-4">
+                  <div className="mt-5 space-y-4">
 
-                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="rounded-lg bg-gray-50 p-4">
 
-                    <p className="text-sm font-medium text-gray-900">
-                      Nume aplicație
-                    </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        Nume aplicație
+                      </p>
 
-                    <p className="mt-1 text-sm text-gray-500">
-                      Melitax Montări
-                    </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Melitax Montări
+                      </p>
 
-                  </div>
+                    </div>
 
-                  <div className="rounded-lg bg-gray-50 p-4">
+                    <div className="rounded-lg bg-gray-50 p-4">
 
-                    <p className="text-sm font-medium text-gray-900">
-                      Versiune
-                    </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        Versiune
+                      </p>
 
-                    <p className="mt-1 text-sm text-gray-500">
-                      0.1.0
-                    </p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        0.1.0
+                      </p>
+
+                    </div>
 
                   </div>
 

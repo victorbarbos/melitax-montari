@@ -7,7 +7,11 @@ import { supabase } from "@/lib/supabase/client";
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
+
   const [isSuperAdmin, setIsSuperAdmin] =
+    useState(false);
+
+  const [canSeeMontatori, setCanSeeMontatori] =
     useState(false);
 
   // ==================================================
@@ -29,6 +33,7 @@ export default function Sidebar() {
 
         if (!user) {
           setIsSuperAdmin(false);
+          setCanSeeMontatori(false);
           return;
         }
 
@@ -52,16 +57,39 @@ export default function Sidebar() {
           );
 
           setIsSuperAdmin(false);
+          setCanSeeMontatori(false);
           return;
         }
 
+        const activeUser =
+          profile.active === true;
+
         // --------------------------------------------
-        // DOAR SUPER ADMINISTRATOR ACTIV
+        // SUPER ADMINISTRATOR
         // --------------------------------------------
 
-        setIsSuperAdmin(
+        const superAdmin =
           profile.role === "super_admin" &&
-          profile.active === true
+          activeUser;
+
+        setIsSuperAdmin(
+          superAdmin
+        );
+
+        // --------------------------------------------
+        // MONTATORI
+        //
+        // Super Administrator + Administrator
+        // --------------------------------------------
+
+        setCanSeeMontatori(
+          activeUser &&
+          (
+            profile.role ===
+              "super_admin" ||
+            profile.role ===
+              "administrator"
+          )
         );
       } catch (error) {
         console.error(
@@ -70,6 +98,7 @@ export default function Sidebar() {
         );
 
         setIsSuperAdmin(false);
+        setCanSeeMontatori(false);
       }
     };
 
@@ -181,15 +210,20 @@ export default function Sidebar() {
             📋 Intervenții
           </Link>
 
-          {/* MONTATORI */}
+          {/* ==================================================
+              MONTATORI
+              DOAR SUPER ADMINISTRATOR + ADMINISTRATOR
+          ================================================== */}
 
-          <Link
-            href="/montatori"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 transition hover:bg-slate-800"
-          >
-            👷 Montatori
-          </Link>
+          {canSeeMontatori && (
+            <Link
+              href="/montatori"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg p-3 transition hover:bg-slate-800"
+            >
+              👷 Montatori
+            </Link>
+          )}
 
           {/* CLIENȚI */}
 
@@ -201,15 +235,20 @@ export default function Sidebar() {
             👥 Clienți
           </Link>
 
-          {/* SETĂRI */}
+          {/* ==================================================
+              SETĂRI
+              DOAR SUPER ADMINISTRATOR ACTIV
+          ================================================== */}
 
-          <Link
-            href="/setari"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg p-3 transition hover:bg-slate-800"
-          >
-            ⚙️ Setări
-          </Link>
+          {isSuperAdmin && (
+            <Link
+              href="/setari"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg p-3 transition hover:bg-slate-800"
+            >
+              ⚙️ Setări
+            </Link>
+          )}
 
           {/* ==================================================
               AUDIT LOG

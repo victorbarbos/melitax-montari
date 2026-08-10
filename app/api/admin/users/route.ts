@@ -815,6 +815,14 @@ export async function PUT(
     const body =
       await request.json();
 
+    const temporaryPassword =
+      body.temporaryPassword !== undefined
+        ? String(body.temporaryPassword)
+        : "";
+
+    const hasTemporaryPassword =
+      temporaryPassword.length > 0;
+
     const targetUserId =
       String(
         body.id ??
@@ -934,7 +942,59 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 7. DATE VECHI
+    // 7. PAROLĂ TEMPORARĂ
+    // --------------------------------------------------
+
+    // Parola temporară este opțională.
+    // Dacă este goală, parola utilizatorului NU se modifică.
+    if (hasTemporaryPassword) {
+      if (
+        currentProfile.role !==
+        "super_admin"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Doar Super Administratorul poate seta o parolă temporară.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      if (
+        targetUserId ===
+        currentUser.id
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Parola temporară poate fi setată doar pentru alt utilizator.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      if (
+        temporaryPassword.length < 8
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Parola temporară trebuie să conțină cel puțin 8 caractere.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
+
+    // --------------------------------------------------
+    // 8. DATE VECHI
     // --------------------------------------------------
 
     const oldData = {
@@ -970,7 +1030,7 @@ export async function PUT(
       targetProfile.active;
 
     // --------------------------------------------------
-    // 8. NUME
+    // 9. NUME
     // --------------------------------------------------
 
     if (
@@ -996,7 +1056,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 9. TELEFON
+    // 10. TELEFON
     // --------------------------------------------------
 
     if (
@@ -1012,7 +1072,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 10. ROL
+    // 11. ROL
     // --------------------------------------------------
 
     if (
@@ -1084,7 +1144,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 11. ECHIPĂ
+    // 12. ECHIPĂ
     // --------------------------------------------------
 
     if (
@@ -1132,7 +1192,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 12. ACTIV / INACTIV
+    // 13. ACTIV / INACTIV
     // --------------------------------------------------
 
     if (
@@ -1169,7 +1229,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 13. ADMINISTRATOR → NU POATE MODIFICA SUPER ADMIN
+    // 14. ADMINISTRATOR → NU POATE MODIFICA SUPER ADMIN
     // --------------------------------------------------
 
     if (
@@ -1190,7 +1250,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 14. EXISTĂ MODIFICĂRI?
+    // 15. EXISTĂ MODIFICĂRI?
     // --------------------------------------------------
 
     const hasChanges =
@@ -1203,7 +1263,8 @@ export async function PUT(
       newTeamId !==
         targetProfile.team_id ||
       newActive !==
-        targetProfile.active;
+        targetProfile.active ||
+      hasTemporaryPassword;
 
     if (!hasChanges) {
       return NextResponse.json(
@@ -1219,7 +1280,42 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 15. ACTUALIZARE PROFIL
+    // 16. ACTUALIZARE PAROLĂ ÎN SUPABASE AUTH
+    // --------------------------------------------------
+
+    if (hasTemporaryPassword) {
+      const {
+        error: passwordUpdateError,
+      } =
+        await supabaseAdmin.auth.admin.updateUserById(
+          targetUserId,
+          {
+            password:
+              temporaryPassword,
+          }
+        );
+
+      if (passwordUpdateError) {
+        console.error(
+          "UPDATE TEMPORARY PASSWORD ERROR:",
+          passwordUpdateError
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              passwordUpdateError.message ??
+              "Parola temporară nu a putut fi setată.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+    }
+
+    // --------------------------------------------------
+    // 17. ACTUALIZARE PROFIL
     // --------------------------------------------------
 
     const {
@@ -1243,6 +1339,13 @@ export async function PUT(
 
           active:
             newActive,
+
+          ...(hasTemporaryPassword
+            ? {
+                must_change_password:
+                  true,
+              }
+            : {}),
 
           updated_at:
             new Date().toISOString(),
@@ -1276,7 +1379,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 16. DATE NOI
+    // 17. DATE NOI
     // --------------------------------------------------
 
     const newData = {
@@ -1297,7 +1400,7 @@ export async function PUT(
     };
 
     // --------------------------------------------------
-    // 17. AUDIT — UPDATE
+    // 18. AUDIT — UPDATE
     // --------------------------------------------------
 
     try {
@@ -1329,7 +1432,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 18. AUDIT — SCHIMBARE ROL
+    // 19. AUDIT — SCHIMBARE ROL
     // --------------------------------------------------
 
     if (
@@ -1372,7 +1475,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 19. AUDIT — SCHIMBARE ECHIPĂ
+    // 20. AUDIT — SCHIMBARE ECHIPĂ
     // --------------------------------------------------
 
     if (
@@ -1415,7 +1518,7 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 20. AUDIT — STATUS
+    // 21. AUDIT — STATUS
     // --------------------------------------------------
 
     if (
@@ -1458,7 +1561,45 @@ export async function PUT(
     }
 
     // --------------------------------------------------
-    // 21. RĂSPUNS
+    // 22. AUDIT — PAROLĂ TEMPORARĂ
+    // --------------------------------------------------
+
+    if (hasTemporaryPassword) {
+      try {
+        await createAuditLog({
+          userId:
+            currentUser.id,
+
+          action:
+            "PASSWORD_RESET",
+
+          entityType:
+            "USER",
+
+          entityId:
+            targetUserId,
+
+          entityName:
+            updatedProfile.full_name,
+
+          oldData:
+            null,
+
+          newData: {
+            must_change_password:
+              true,
+          },
+        });
+      } catch (auditError) {
+        console.error(
+          "PASSWORD RESET AUDIT ERROR:",
+          auditError
+        );
+      }
+    }
+
+    // --------------------------------------------------
+    // 23. RĂSPUNS
     // --------------------------------------------------
 
     return NextResponse.json(
